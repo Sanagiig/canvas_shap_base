@@ -4,6 +4,4 @@ declare interface Arrow {
   width:number;
   height:number;
   rotation:number;
-  fillStyle:string;
-  strokeStyle:string;
 }
