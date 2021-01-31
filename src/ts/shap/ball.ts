@@ -6,7 +6,6 @@ export class Ball extends Shap {
   public alpha = 1;
   constructor(option: any) {
     super(option);
-    this.propertyInit(option);
   }
   render(ctx: CanvasRenderingContext2D) {
     let { fillStyle, strokeStyle, x, y, r, scaleX, scaleY, alpha } = this;

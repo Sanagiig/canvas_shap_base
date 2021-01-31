@@ -1,3 +1,4 @@
+import { propertyInit } from "../utils/index"
 export class Shap {
   public x: number = 0;
   public y: number = 0;
@@ -10,15 +11,7 @@ export class Shap {
   constructor(option: any) {
     this.propertyInit(option);
   }
-  propertyInit(option:any){
-    let keys = Object.keys(this);
-    let key:any;
-    for(key in option){
-      if(keys.indexOf(key) > -1){
-        Object.defineProperty(this,key,{
-          value:option[key]
-        })
-      }
-    }
+  propertyInit(option: any) {
+    propertyInit(this, option);
   }
 }

@@ -2,6 +2,7 @@ import { Shap } from "./base";
 export default class Arrow extends Shap {
   constructor(props: any) {
     super(props)
+    this.propertyInit(props);
     this.computePoints();
   }
   private computePoints() {

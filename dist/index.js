@@ -24,6 +24,7 @@ var __importStar = (this && this.__importStar) || function (mod) {
 define("ts/utils/index", ["require", "exports"], function (require, exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
+    exports.propertyInit = void 0;
     exports.default = {
         getOffset(event) {
             return this.eventWraper(event);
@@ -38,8 +39,25 @@ define("ts/utils/index", ["require", "exports"], function (require, exports) {
         },
         toAng(rand) {
             return rand * 180 / Math.PI;
-        }
+        },
     };
+    function propertyInit(target, option) {
+        let keys = Object.keys(target);
+        let key;
+        console.log(target, option, keys);
+        for (key in option) {
+            if (keys.indexOf(key) > -1) {
+                let val = option[key];
+                if (val instanceof Array) {
+                    target[key] = val.slice();
+                }
+                else {
+                    target[key] = val;
+                }
+            }
+        }
+    }
+    exports.propertyInit = propertyInit;
 });
 define("ts/draw/index", ["require", "exports"], function (require, exports) {
     "use strict";
@@ -78,7 +96,7 @@ define("ts/draw/index", ["require", "exports"], function (require, exports) {
     }
     exports.clear = clear;
 });
-define("ts/shap/base", ["require", "exports"], function (require, exports) {
+define("ts/shap/base", ["require", "exports", "ts/utils/index"], function (require, exports, index_1) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.Shap = void 0;
@@ -95,15 +113,7 @@ define("ts/shap/base", ["require", "exports"], function (require, exports) {
             this.propertyInit(option);
         }
         propertyInit(option) {
-            let keys = Object.keys(this);
-            let key;
-            for (key in option) {
-                if (keys.indexOf(key) > -1) {
-                    Object.defineProperty(this, key, {
-                        value: option[key]
-                    });
-                }
-            }
+            index_1.propertyInit(this, option);
         }
     }
     exports.Shap = Shap;
@@ -114,6 +124,7 @@ define("ts/shap/arrow", ["require", "exports", "ts/shap/base"], function (requir
     class Arrow extends base_1.Shap {
         constructor(props) {
             super(props);
+            this.propertyInit(props);
             this.computePoints();
         }
         computePoints() {
@@ -169,7 +180,6 @@ define("ts/shap/ball", ["require", "exports", "ts/shap/base"], function (require
             this.scaleY = 1;
             this.r = 20;
             this.alpha = 1;
-            this.propertyInit(option);
         }
         render(ctx) {
             let { fillStyle, strokeStyle, x, y, r, scaleX, scaleY, alpha } = this;
@@ -189,11 +199,11 @@ define("ts/shap/ball", ["require", "exports", "ts/shap/base"], function (require
     }
     exports.Ball = Ball;
 });
-define("ts/animation/slide", ["require", "exports", "ts/utils/index", "ts/draw/index"], function (require, exports, index_1, index_2) {
+define("ts/animation/slide", ["require", "exports", "ts/utils/index", "ts/draw/index"], function (require, exports, index_2, index_3) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.Slide = void 0;
-    index_1 = __importDefault(index_1);
+    index_2 = __importDefault(index_2);
     class Slide {
         constructor(shaps) {
             this.angle = 0;
@@ -205,10 +215,10 @@ define("ts/animation/slide", ["require", "exports", "ts/utils/index", "ts/draw/i
         move(ctx) {
             window.requestAnimationFrame(_ => {
                 let { shaps, angle, swing } = this;
-                index_2.clear(ctx);
+                index_3.clear(ctx);
                 for (let i = 0; i < shaps.length; i++) {
                     let shap = shaps[i];
-                    shap.x = Math.sin(index_1.default.toRad(angle)) * swing + this.start;
+                    shap.x = Math.sin(index_2.default.toRad(angle)) * swing + this.start;
                     shap.render(ctx);
                 }
                 this.angle += 0.5;
@@ -218,11 +228,11 @@ define("ts/animation/slide", ["require", "exports", "ts/utils/index", "ts/draw/i
     }
     exports.Slide = Slide;
 });
-define("ts/animation/circle", ["require", "exports", "ts/utils/index", "ts/draw/index"], function (require, exports, index_3, index_4) {
+define("ts/animation/circle", ["require", "exports", "ts/utils/index", "ts/draw/index"], function (require, exports, index_4, index_5) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.Circle = void 0;
-    index_3 = __importDefault(index_3);
+    index_4 = __importDefault(index_4);
     class Circle {
         constructor(shaps) {
             this.r = 50;
@@ -253,8 +263,8 @@ define("ts/animation/circle", ["require", "exports", "ts/utils/index", "ts/draw/
         move(ctx) {
             window.requestAnimationFrame(_ => {
                 let { shaps, r, points } = this;
-                let rad = index_3.default.toRad(this.angle);
-                index_4.clear(ctx);
+                let rad = index_4.default.toRad(this.angle);
+                index_5.clear(ctx);
                 for (let i = 0; i < shaps.length; i++) {
                     let p = points[i];
                     let s = shaps[i];
@@ -270,11 +280,11 @@ define("ts/animation/circle", ["require", "exports", "ts/utils/index", "ts/draw/
     }
     exports.Circle = Circle;
 });
-define("ts/animation/oval", ["require", "exports", "ts/utils/index", "ts/draw/index"], function (require, exports, index_5, index_6) {
+define("ts/animation/oval", ["require", "exports", "ts/utils/index", "ts/draw/index"], function (require, exports, index_6, index_7) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.Oval = void 0;
-    index_5 = __importDefault(index_5);
+    index_6 = __importDefault(index_6);
     class Oval {
         constructor(shaps) {
             this.ra = 150;
@@ -306,8 +316,8 @@ define("ts/animation/oval", ["require", "exports", "ts/utils/index", "ts/draw/in
         move(ctx) {
             window.requestAnimationFrame(_ => {
                 let { shaps, ra, rb, points } = this;
-                let rad = index_5.default.toRad(this.angle);
-                index_6.clear(ctx);
+                let rad = index_6.default.toRad(this.angle);
+                index_7.clear(ctx);
                 for (let i = 0; i < shaps.length; i++) {
                     let p = points[i];
                     let s = shaps[i];
@@ -323,9 +333,149 @@ define("ts/animation/oval", ["require", "exports", "ts/utils/index", "ts/draw/in
     }
     exports.Oval = Oval;
 });
-define("ts/index", ["require", "exports", "ts/draw/index", "ts/shap/arrow", "ts/shap/ball", "ts/animation/circle", "ts/animation/oval"], function (require, exports, draw, arrow_1, ball_1, circle_1, oval_1) {
+define("ts/animation/base", ["require", "exports", "ts/utils/index"], function (require, exports, index_8) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
+    exports.BaseAnimation = void 0;
+    class BaseAnimation {
+        constructor(option) {
+        }
+        propertyInit(option) {
+            index_8.propertyInit(this, option);
+        }
+    }
+    exports.BaseAnimation = BaseAnimation;
+});
+define("ts/animation/vectorAnimation", ["require", "exports", "ts/animation/base", "ts/draw/index"], function (require, exports, base_3, index_9) {
+    "use strict";
+    Object.defineProperty(exports, "__esModule", { value: true });
+    exports.VectorAnimation = void 0;
+    class VectorAnimation extends base_3.BaseAnimation {
+        constructor(option) {
+            super(option);
+            this.vectors = [];
+            this.shaps = [];
+            this.propertyInit(option);
+        }
+        move(ctx) {
+            window.requestAnimationFrame(_ => {
+                let { shaps, vectors } = this;
+                index_9.clear(ctx);
+                for (let i = 0; i < shaps.length; i++) {
+                    let shap = shaps[i];
+                    for (let j = 0; j < vectors.length; j++) {
+                        let verctor = vectors[j];
+                        shap.x += verctor.xStep;
+                        shap.y += verctor.yStep;
+                    }
+                    shap.render(ctx);
+                }
+                this.move(ctx);
+            });
+        }
+    }
+    exports.VectorAnimation = VectorAnimation;
+});
+define("ts/vector/index", ["require", "exports", "ts/utils/index"], function (require, exports, index_10) {
+    "use strict";
+    Object.defineProperty(exports, "__esModule", { value: true });
+    exports.Vector = void 0;
+    index_10 = __importStar(index_10);
+    class Vector {
+        constructor(option) {
+            this.vx = 0;
+            this.vy = 0;
+            this.angle = 0;
+            this.xStep = 0;
+            this.yStep = 0;
+            index_10.propertyInit(this, option);
+            this.computeStep();
+        }
+        computeStep() {
+            let rad = index_10.default.toRad(this.angle);
+            this.xStep = this.vx * Math.cos(rad);
+            this.yStep = this.vy * Math.sin(rad);
+        }
+    }
+    exports.Vector = Vector;
+});
+define("ts/animation/flow", ["require", "exports", "ts/draw/index", "ts/animation/base"], function (require, exports, index_11, base_4) {
+    "use strict";
+    Object.defineProperty(exports, "__esModule", { value: true });
+    exports.FlowAnimation = void 0;
+    class FlowAnimation extends base_4.BaseAnimation {
+        constructor(option) {
+            super(option);
+            this.shaps = [];
+            this.x = 0;
+            this.y = 0;
+            this.speed = 3;
+            this.propertyInit(option);
+        }
+        move(ctx) {
+            window.requestAnimationFrame(_ => {
+                let { shaps, x, y, speed } = this;
+                index_11.clear(ctx);
+                for (let i = 0; i < shaps.length; i++) {
+                    let s = shaps[i];
+                    let sx = s.x, sy = s.y;
+                    let dx = x - sx, dy = y - sy;
+                    let angle = Math.atan2(dy, dx);
+                    let xStep = speed * Math.cos(angle), yStep = speed * Math.sin(angle);
+                    s.x = Math.abs(xStep) > Math.abs(dx) ? x : sx + xStep;
+                    s.y = Math.abs(yStep) > Math.abs(dy) ? y : sy + yStep;
+                    if (Math.abs(xStep) < Math.abs(dx)) {
+                        s.rotation = angle;
+                    }
+                    s.render(ctx);
+                }
+                this.move(ctx);
+            });
+        }
+    }
+    exports.FlowAnimation = FlowAnimation;
+});
+define("ts/animation/gravity", ["require", "exports", "ts/animation/base", "ts/draw/index"], function (require, exports, base_5, index_12) {
+    "use strict";
+    Object.defineProperty(exports, "__esModule", { value: true });
+    exports.GravityAnimation = void 0;
+    class GravityAnimation extends base_5.BaseAnimation {
+        constructor(option) {
+            super(option);
+            this.gravity = 0.2;
+            this.shaps = [];
+            this.shapsStates = [];
+            this.propertyInit(option);
+            this.shapsStates = Array(this.shaps.length);
+            for (let i = 0; i < this.shaps.length; i++) {
+                this.shapsStates[i] = { vy: 0 };
+            }
+        }
+        move(ctx) {
+            window.requestAnimationFrame(_ => {
+                let { gravity, shaps, shapsStates } = this;
+                index_12.clear(ctx);
+                for (let i = 0; i < shaps.length; i++) {
+                    let s = shaps[i];
+                    let ss = shapsStates[i];
+                    s.y += ss.vy;
+                    ss.vy += gravity;
+                    if (s.y + s.r >= index_12.H) {
+                        s.y = index_12.H - s.r;
+                        ss.vy *= -0.8;
+                    }
+                    s.render(ctx);
+                }
+                this.move(ctx);
+            });
+        }
+    }
+    exports.GravityAnimation = GravityAnimation;
+});
+define("ts/index", ["require", "exports", "ts/utils/index", "ts/draw/index", "ts/shap/arrow", "ts/shap/ball", "ts/animation/circle", "ts/animation/oval", "ts/animation/vectorAnimation", "ts/vector/index", "ts/animation/flow", "ts/animation/gravity"], function (require, exports, index_13, draw, arrow_1, ball_1, circle_1, oval_1, vectorAnimation_1, index_14, flow_1, gravity_1) {
+    "use strict";
+    Object.defineProperty(exports, "__esModule", { value: true });
+    index_13 = __importDefault(index_13);
     draw = __importStar(draw);
     arrow_1 = __importDefault(arrow_1);
     function init(e) {
@@ -336,34 +486,54 @@ define("ts/index", ["require", "exports", "ts/draw/index", "ts/shap/arrow", "ts/
         // let slide = new Slide([ball]);
         let circle = new circle_1.Circle([ball, arrow]);
         let oval = new oval_1.Oval([ball, arrow]);
-        // canvas?.addEventListener("mousemove",function(e){
-        //   let pos = utils.getOffset(e);
-        //   let dx = pos.x - draw.W /2;
-        //   let dy = pos.y - draw.H /2;
-        //   let rad = Math.atan2(dy,dx)
-        //   let angle = Math.atan(dy/dx) * 180 / Math.PI;
-        //   let angle2 = Math.atan2(dy,dx) * 180 / Math.PI;
-        //   let res = `x: ${dx} , y: ${dy}`
-        //   let res2 = `angle : ${angle} `
-        //   let res3 = `angle2 : ${angle2}`
-        //   draw.clear(ctx);
-        //   // draw.drawSystem(ctx);
-        //   // draw.drawLine(ctx,pos);
-        //   arrow.rotation = rad;
-        //   ball.render(ctx);
-        //   // arrow.render(ctx);
-        //   ctx.fillText(rad + '',pos.x + 10,pos.y);
-        //   ctx.fillText(res2,pos.x + 10,pos.y + 20);
-        //   ctx.fillText(res3,pos.x + 10,pos.y + 40);
-        // })
+        let vec = new vectorAnimation_1.VectorAnimation({
+            shaps: [ball],
+            vectors: [new index_14.Vector({
+                    vx: 0.5,
+                    vy: 0.5,
+                    angle: 1
+                })]
+        });
+        let flow = new flow_1.FlowAnimation({ shaps: [arrow] });
+        let gravity = new gravity_1.GravityAnimation({ shaps: [ball] });
+        canvas === null || canvas === void 0 ? void 0 : canvas.addEventListener("mousemove", function (e) {
+            let pos = index_13.default.getOffset(e);
+            let dx = pos.x - draw.W / 2;
+            let dy = pos.y - draw.H / 2;
+            let rad = Math.atan2(dy, dx);
+            let angle = Math.atan(dy / dx) * 180 / Math.PI;
+            let angle2 = Math.atan2(dy, dx) * 180 / Math.PI;
+            let res = `x: ${dx} , y: ${dy}`;
+            let res2 = `angle : ${angle} `;
+            let res3 = `angle2 : ${angle2}`;
+            draw.clear(ctx);
+            ctx.fillText(rad + `   dx:${dx}, dy:${dy}`, pos.x + 10, pos.y);
+            ctx.fillText(res2, pos.x + 10, pos.y + 20);
+            ctx.fillText(res3, pos.x + 10, pos.y + 40);
+            flow.x = pos.x;
+            flow.y = pos.y;
+            draw.drawSystem(ctx);
+        });
         canvas.addEventListener("click", e => {
             draw.clear(ctx);
         });
         draw.initDraw(canvas);
         // slide.move(ctx);
         // circle.move(ctx);
-        oval.move(ctx);
+        // oval.move(ctx);
+        // vec.move(ctx);
+        // flow.move(ctx);
+        gravity.move(ctx);
+        console.log(gravity);
         console.log("canvas init");
     }
     exports.default = init;
+});
+define("ts/base/index", ["require", "exports"], function (require, exports) {
+    "use strict";
+    Object.defineProperty(exports, "__esModule", { value: true });
+    exports.PropertyBase = void 0;
+    class PropertyBase {
+    }
+    exports.PropertyBase = PropertyBase;
 });
