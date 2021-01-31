@@ -29,4 +29,5 @@ export function drawLine(ctx: CanvasRenderingContext2D, pos: any) {
 
 export function clear(ctx: CanvasRenderingContext2D) {
   ctx.clearRect(0, 0, W, H);
+  console.log("clear")
 }

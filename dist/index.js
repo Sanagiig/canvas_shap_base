@@ -1,3 +1,7 @@
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
     Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
@@ -16,9 +20,6 @@ var __importStar = (this && this.__importStar) || function (mod) {
     if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
     __setModuleDefault(result, mod);
     return result;
-};
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 define("ts/utils/index", ["require", "exports"], function (require, exports) {
     "use strict";
@@ -73,14 +74,16 @@ define("ts/draw/index", ["require", "exports"], function (require, exports) {
     exports.drawLine = drawLine;
     function clear(ctx) {
         ctx.clearRect(0, 0, exports.W, exports.H);
+        console.log("clear");
     }
     exports.clear = clear;
 });
-define("ts/shap/arrow", ["require", "exports"], function (require, exports) {
+define("ts/shap/base", ["require", "exports"], function (require, exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
-    class Arrow {
-        constructor(ctx, props) {
+    exports.Shap = void 0;
+    class Shap {
+        constructor(option) {
             this.x = 0;
             this.y = 0;
             this.width = 400;
@@ -89,27 +92,32 @@ define("ts/shap/arrow", ["require", "exports"], function (require, exports) {
             this.fillStyle = "rgba(57,119,224)";
             this.strokeStyle = "rgba(0,0,0)";
             this.points = [];
-            this.ctx = ctx;
-            Object.assign(this, props);
+            this.propertyInit(option);
+        }
+        propertyInit(option) {
+            let keys = Object.keys(this);
+            let key;
+            for (key in option) {
+                if (keys.indexOf(key) > -1) {
+                    Object.defineProperty(this, key, {
+                        value: option[key]
+                    });
+                }
+            }
+        }
+    }
+    exports.Shap = Shap;
+});
+define("ts/shap/arrow", ["require", "exports", "ts/shap/base"], function (require, exports, base_1) {
+    "use strict";
+    Object.defineProperty(exports, "__esModule", { value: true });
+    class Arrow extends base_1.Shap {
+        constructor(props) {
+            super(props);
             this.computePoints();
         }
-        // private computePoints() {
-        //   const { points, x, y, width, height } = this;
-        //   points.length = 0;
-        //   // 左上
-        //   points.push({ x: -width / 2 + x, y: -height / 2 + y });
-        //   // 左下
-        //   points.push({ x: -width / 2 + x, y: height / 2 + y });
-        //   points.push({ x: width / 10 + x , y: height / 2 + y });
-        //   // 右下
-        //   points.push({ x: width / 10 + x , y: height + y });
-        //   points.push({ x: width / 2 + x, y });
-        //   // 右上
-        //   points.push({ x: width / 10 + x, y: -height + y });
-        //   points.push({ x: width / 10 + x, y: -height / 2 + y });
-        // }
         computePoints() {
-            const { points, x, y, width, height } = this;
+            const { points, width, height } = this;
             points.length = 0;
             // 左上
             points.push({ x: -width / 2, y: -height / 2 });
@@ -125,7 +133,6 @@ define("ts/shap/arrow", ["require", "exports"], function (require, exports) {
         }
         createPath(ctx) {
             let { points } = this;
-            ctx = ctx || this.ctx;
             ctx.beginPath();
             ctx.moveTo(points[0].x, points[0].y);
             for (let i = 1; i < points.length; i++) {
@@ -137,13 +144,12 @@ define("ts/shap/arrow", ["require", "exports"], function (require, exports) {
         }
         render(ctx) {
             let { fillStyle, strokeStyle, x, y, rotation } = this;
-            ctx = ctx || this.ctx;
             ctx.save();
             ctx.fillStyle = fillStyle;
             ctx.strokeStyle = strokeStyle;
             ctx.translate(x, y);
             ctx.rotate(rotation);
-            this.createPath();
+            this.createPath(ctx);
             ctx.stroke();
             ctx.fill();
             ctx.restore();
@@ -152,52 +158,211 @@ define("ts/shap/arrow", ["require", "exports"], function (require, exports) {
     }
     exports.default = Arrow;
 });
-define("ts/index", ["require", "exports", "ts/utils/index", "ts/draw/index", "ts/shap/arrow"], function (require, exports, index_1, draw, arrow_1) {
+define("ts/shap/ball", ["require", "exports", "ts/shap/base"], function (require, exports, base_2) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
+    exports.Ball = void 0;
+    class Ball extends base_2.Shap {
+        constructor(option) {
+            super(option);
+            this.scaleX = 1;
+            this.scaleY = 1;
+            this.r = 20;
+            this.alpha = 1;
+            this.propertyInit(option);
+        }
+        render(ctx) {
+            let { fillStyle, strokeStyle, x, y, r, scaleX, scaleY, alpha } = this;
+            ctx.save();
+            ctx.fillStyle = fillStyle;
+            ctx.strokeStyle = strokeStyle;
+            ctx.translate(x, y);
+            ctx.scale(scaleX, scaleY);
+            ctx.globalAlpha = alpha;
+            ctx.beginPath();
+            ctx.arc(0, 0, r, 0, 2 * Math.PI);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+            ctx.restore();
+        }
+    }
+    exports.Ball = Ball;
+});
+define("ts/animation/slide", ["require", "exports", "ts/utils/index", "ts/draw/index"], function (require, exports, index_1, index_2) {
+    "use strict";
+    Object.defineProperty(exports, "__esModule", { value: true });
+    exports.Slide = void 0;
     index_1 = __importDefault(index_1);
+    class Slide {
+        constructor(shaps) {
+            this.angle = 0;
+            this.shaps = [];
+            this.swing = 160;
+            this.start = 300;
+            this.shaps = shaps.slice();
+        }
+        move(ctx) {
+            window.requestAnimationFrame(_ => {
+                let { shaps, angle, swing } = this;
+                index_2.clear(ctx);
+                for (let i = 0; i < shaps.length; i++) {
+                    let shap = shaps[i];
+                    shap.x = Math.sin(index_1.default.toRad(angle)) * swing + this.start;
+                    shap.render(ctx);
+                }
+                this.angle += 0.5;
+                this.move(ctx);
+            });
+        }
+    }
+    exports.Slide = Slide;
+});
+define("ts/animation/circle", ["require", "exports", "ts/utils/index", "ts/draw/index"], function (require, exports, index_3, index_4) {
+    "use strict";
+    Object.defineProperty(exports, "__esModule", { value: true });
+    exports.Circle = void 0;
+    index_3 = __importDefault(index_3);
+    class Circle {
+        constructor(shaps) {
+            this.r = 50;
+            this.points = [];
+            this.angle = 0;
+            this.shaps = [];
+            this.shaps = shaps.slice();
+            this.shaps.forEach(s => {
+                this.points.push({ x: s.x, y: s.y });
+            });
+        }
+        drawTrace(ctx) {
+            let { shaps, points, r } = this;
+            ctx.save();
+            for (let i = 0; i < shaps.length; i++) {
+                let s = shaps[i];
+                let p = points[i];
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, r, 0, 2 * Math.PI);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.fillStyle = "rgb(255,0,0)";
+                ctx.arc(s.x, s.y, 2, 0, 2 * Math.PI);
+                ctx.fill();
+            }
+            ctx.restore();
+        }
+        move(ctx) {
+            window.requestAnimationFrame(_ => {
+                let { shaps, r, points } = this;
+                let rad = index_3.default.toRad(this.angle);
+                index_4.clear(ctx);
+                for (let i = 0; i < shaps.length; i++) {
+                    let p = points[i];
+                    let s = shaps[i];
+                    s.x = p.x + Math.cos(rad) * r;
+                    s.y = p.y + Math.sin(rad) * r;
+                    s.render(ctx);
+                }
+                this.angle = (this.angle + 1) % 360;
+                this.drawTrace(ctx);
+                this.move(ctx);
+            });
+        }
+    }
+    exports.Circle = Circle;
+});
+define("ts/animation/oval", ["require", "exports", "ts/utils/index", "ts/draw/index"], function (require, exports, index_5, index_6) {
+    "use strict";
+    Object.defineProperty(exports, "__esModule", { value: true });
+    exports.Oval = void 0;
+    index_5 = __importDefault(index_5);
+    class Oval {
+        constructor(shaps) {
+            this.ra = 150;
+            this.rb = 50;
+            this.points = [];
+            this.angle = 0;
+            this.shaps = [];
+            this.shaps = shaps.slice();
+            this.shaps.forEach(s => {
+                this.points.push({ x: s.x, y: s.y });
+            });
+        }
+        drawTrace(ctx) {
+            let { shaps, points, ra, rb } = this;
+            ctx.save();
+            for (let i = 0; i < shaps.length; i++) {
+                let s = shaps[i];
+                let p = points[i];
+                ctx.beginPath();
+                ctx.ellipse(p.x, p.y, ra, rb, 0, 0, 2 * Math.PI);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.fillStyle = "rgb(255,0,0)";
+                ctx.arc(s.x, s.y, 5, 0, 2 * Math.PI);
+                ctx.fill();
+            }
+            ctx.restore();
+        }
+        move(ctx) {
+            window.requestAnimationFrame(_ => {
+                let { shaps, ra, rb, points } = this;
+                let rad = index_5.default.toRad(this.angle);
+                index_6.clear(ctx);
+                for (let i = 0; i < shaps.length; i++) {
+                    let p = points[i];
+                    let s = shaps[i];
+                    s.x = p.x + Math.cos(rad) * ra;
+                    s.y = p.y + Math.sin(rad) * rb;
+                    s.render(ctx);
+                }
+                this.angle = (this.angle + 1) % 360;
+                this.drawTrace(ctx);
+                this.move(ctx);
+            });
+        }
+    }
+    exports.Oval = Oval;
+});
+define("ts/index", ["require", "exports", "ts/draw/index", "ts/shap/arrow", "ts/shap/ball", "ts/animation/circle", "ts/animation/oval"], function (require, exports, draw, arrow_1, ball_1, circle_1, oval_1) {
+    "use strict";
+    Object.defineProperty(exports, "__esModule", { value: true });
     draw = __importStar(draw);
     arrow_1 = __importDefault(arrow_1);
     function init(e) {
         let canvas = document.getElementById("canvas");
         let ctx = canvas.getContext("2d");
-        let arrow = new arrow_1.default(ctx, { x: draw.W / 2, y: draw.H / 2 });
-        let arrow2 = new arrow_1.default(ctx, { x: draw.W / 2, y: draw.H / 2, rotation: 30 });
-        let arrow3 = new arrow_1.default(ctx, { x: draw.W / 2, y: draw.H / 2, rotation: 80 });
-        canvas === null || canvas === void 0 ? void 0 : canvas.addEventListener("mousemove", function (e) {
-            let pos = index_1.default.getOffset(e);
-            let dx = pos.x - draw.W / 2;
-            let dy = pos.y - draw.H / 2;
-            let rad = Math.atan2(dy, dx);
-            let angle = Math.atan(dy / dx) * 180 / Math.PI;
-            let angle2 = Math.atan2(dy, dx) * 180 / Math.PI;
-            let res = `x: ${dx} , y: ${dy}`;
-            let res2 = `angle : ${angle} `;
-            let res3 = `angle2 : ${angle2}`;
+        let arrow = new arrow_1.default({ x: draw.W / 2, y: draw.H / 6 });
+        let ball = new ball_1.Ball({ x: draw.W / 2, y: draw.H / 2, r: 30 });
+        // let slide = new Slide([ball]);
+        let circle = new circle_1.Circle([ball, arrow]);
+        let oval = new oval_1.Oval([ball, arrow]);
+        // canvas?.addEventListener("mousemove",function(e){
+        //   let pos = utils.getOffset(e);
+        //   let dx = pos.x - draw.W /2;
+        //   let dy = pos.y - draw.H /2;
+        //   let rad = Math.atan2(dy,dx)
+        //   let angle = Math.atan(dy/dx) * 180 / Math.PI;
+        //   let angle2 = Math.atan2(dy,dx) * 180 / Math.PI;
+        //   let res = `x: ${dx} , y: ${dy}`
+        //   let res2 = `angle : ${angle} `
+        //   let res3 = `angle2 : ${angle2}`
+        //   draw.clear(ctx);
+        //   // draw.drawSystem(ctx);
+        //   // draw.drawLine(ctx,pos);
+        //   arrow.rotation = rad;
+        //   ball.render(ctx);
+        //   // arrow.render(ctx);
+        //   ctx.fillText(rad + '',pos.x + 10,pos.y);
+        //   ctx.fillText(res2,pos.x + 10,pos.y + 20);
+        //   ctx.fillText(res3,pos.x + 10,pos.y + 40);
+        // })
+        canvas.addEventListener("click", e => {
             draw.clear(ctx);
-            draw.drawSystem(ctx);
-            // draw.drawLine(ctx,pos);
-            arrow.rotation = rad;
-            arrow2.rotation = rad + 30;
-            arrow3.rotation = rad + 70;
-            arrow.render();
-            arrow2.render();
-            arrow3.render();
-            ctx.fillText(rad + '', pos.x + 10, pos.y);
-            ctx.fillText(res2, pos.x + 10, pos.y + 20);
-            ctx.fillText(res3, pos.x + 10, pos.y + 40);
-        });
-        canvas === null || canvas === void 0 ? void 0 : canvas.addEventListener("click", function (e) {
-            let pos = index_1.default.getOffset(e);
-            let dx = pos.x - draw.W / 2;
-            let dy = pos.y - draw.H / 2;
-            let angle = Math.atan(dy / dx) * 180 / Math.PI;
-            let angle2 = Math.atan2(dy, dx) * 180 / Math.PI;
-            console.log(dx, dy);
-            console.log("angle", angle);
-            console.log("angle2", angle2);
         });
         draw.initDraw(canvas);
+        // slide.move(ctx);
+        // circle.move(ctx);
+        oval.move(ctx);
         console.log("canvas init");
     }
     exports.default = init;
