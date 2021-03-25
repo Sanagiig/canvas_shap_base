@@ -24,7 +24,7 @@ var __importStar = (this && this.__importStar) || function (mod) {
 define("ts/utils/index", ["require", "exports"], function (require, exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
-    exports.propertyInit = void 0;
+    exports.boxBounce = exports.isInBox = exports.propertyInit = void 0;
     exports.default = {
         getOffset(event) {
             return this.eventWraper(event);
@@ -44,7 +44,6 @@ define("ts/utils/index", ["require", "exports"], function (require, exports) {
     function propertyInit(target, option) {
         let keys = Object.keys(target);
         let key;
-        console.log(target, option, keys);
         for (key in option) {
             if (keys.indexOf(key) > -1) {
                 let val = option[key];
@@ -58,6 +57,38 @@ define("ts/utils/index", ["require", "exports"], function (require, exports) {
         }
     }
     exports.propertyInit = propertyInit;
+    function isInBox(shap, w, h) {
+        let { x, y, r } = shap;
+        return x + r > 0 && x - r <= w && y + r > 0 && y - r <= h;
+    }
+    exports.isInBox = isInBox;
+    function boxBounce(shap, state, w, h) {
+        let { x, y, r } = shap;
+        let { vx, vy, bounce } = state;
+        function xBounce() {
+            state.vx *= -bounce;
+        }
+        function yBounce() {
+            state.vy *= -bounce;
+        }
+        if (x - r <= 0) {
+            if (vx < 0)
+                xBounce();
+        }
+        else if (x + r >= w) {
+            if (vx > 0)
+                xBounce();
+        }
+        else if (y + r >= h) {
+            if (vy > 0)
+                yBounce();
+        }
+        else if (y - r <= 0) {
+            if (vy < 0)
+                yBounce();
+        }
+    }
+    exports.boxBounce = boxBounce;
 });
 define("ts/draw/index", ["require", "exports"], function (require, exports) {
     "use strict";
@@ -92,7 +123,6 @@ define("ts/draw/index", ["require", "exports"], function (require, exports) {
     exports.drawLine = drawLine;
     function clear(ctx) {
         ctx.clearRect(0, 0, exports.W, exports.H);
-        console.log("clear");
     }
     exports.clear = clear;
 });
@@ -448,7 +478,7 @@ define("ts/animation/gravity", ["require", "exports", "ts/animation/base", "ts/d
             this.propertyInit(option);
             this.shapsStates = Array(this.shaps.length);
             for (let i = 0; i < this.shaps.length; i++) {
-                this.shapsStates[i] = { vy: 0 };
+                this.shapsStates[i] = { vy: 0, isStop: false };
             }
         }
         move(ctx) {
@@ -458,11 +488,19 @@ define("ts/animation/gravity", ["require", "exports", "ts/animation/base", "ts/d
                 for (let i = 0; i < shaps.length; i++) {
                     let s = shaps[i];
                     let ss = shapsStates[i];
-                    s.y += ss.vy;
-                    ss.vy += gravity;
-                    if (s.y + s.r >= index_12.H) {
-                        s.y = index_12.H - s.r;
-                        ss.vy *= -0.8;
+                    if (!ss.isStop) {
+                        s.y += ss.vy;
+                        ss.vy += gravity;
+                        if (s.y + s.r >= index_12.H) {
+                            s.y = index_12.H - s.r - 1;
+                            ss.vy *= -0.8;
+                            if (i == 0)
+                                console.log(ss);
+                            if (ss.vy < 0 && Math.abs(ss.vy) < 2) {
+                                ss.vy = 0;
+                                ss.isStop = true;
+                            }
+                        }
                     }
                     s.render(ctx);
                 }
@@ -472,60 +510,208 @@ define("ts/animation/gravity", ["require", "exports", "ts/animation/base", "ts/d
     }
     exports.GravityAnimation = GravityAnimation;
 });
-define("ts/index", ["require", "exports", "ts/utils/index", "ts/draw/index", "ts/shap/arrow", "ts/shap/ball", "ts/animation/circle", "ts/animation/oval", "ts/animation/vectorAnimation", "ts/vector/index", "ts/animation/flow", "ts/animation/gravity"], function (require, exports, index_13, draw, arrow_1, ball_1, circle_1, oval_1, vectorAnimation_1, index_14, flow_1, gravity_1) {
+define("ts/animation/fountain", ["require", "exports", "ts/animation/base", "ts/draw/index", "ts/utils/index"], function (require, exports, base_6, index_13, index_14) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
-    index_13 = __importDefault(index_13);
+    exports.FountainAnimation = void 0;
+    class FountainAnimation extends base_6.BaseAnimation {
+        constructor(option) {
+            super(option);
+            this.gravity = 0.2;
+            this.shaps = [];
+            this.shapsStates = [];
+            this.propertyInit(option);
+            this.shapsStates = Array(this.shaps.length);
+            for (let i = 0; i < this.shaps.length; i++) {
+                this.shapsStates[i] = {
+                    vx: Math.random() > 0.5 ? 5 * Math.random() : Math.random() * -5,
+                    vy: 20 * Math.random() + 10,
+                    isStop: false
+                };
+            }
+            this.shaps.forEach(s => this.shapsInit(s));
+        }
+        move(ctx) {
+            window.requestAnimationFrame(_ => {
+                let { shaps, shapsStates } = this;
+                index_13.clear(ctx);
+                shaps.forEach((shap, i) => {
+                    let ss = shapsStates[i];
+                    if (index_14.isInBox(shap, index_13.W, index_13.H) && !ss.isStop) {
+                        shap.y -= ss.vy;
+                        shap.x += ss.vx;
+                    }
+                    else {
+                        this.shapsInit(shap);
+                        // ss.isStop = true;
+                    }
+                    shap.render(ctx);
+                });
+                this.move(ctx);
+            });
+        }
+        shapsInit(shap) {
+            shap.x = index_13.W / 2;
+            shap.y = index_13.H + shap.r;
+        }
+    }
+    exports.FountainAnimation = FountainAnimation;
+});
+define("ts/interactive/throw", ["require", "exports", "ts/draw/index", "ts/utils/index"], function (require, exports, index_15, index_16) {
+    "use strict";
+    Object.defineProperty(exports, "__esModule", { value: true });
+    index_16 = __importStar(index_16);
+    class Throw {
+        constructor(shaps, canvas) {
+            this.shaps = [];
+            this.shapsStates = [];
+            this.bounce = 0.8;
+            this.friction = 0.01;
+            this.gravity = 0.1;
+            this.isMouseDown = false;
+            this.isStop = false;
+            this.canvas = canvas;
+            this.shaps = shaps.slice();
+            this.shapsStates = shaps.map(s => {
+                let ram = Math.random();
+                let bx = 10;
+                let by = 10;
+                return {
+                    vx: ram > 0.5 ? bx * ram : bx * ram * -1,
+                    vy: ram > 0.5 ? by * ram : by * ram * -1,
+                    gravity: this.gravity,
+                    friction: this.friction,
+                    bounce: this.bounce,
+                    isSelected: false,
+                };
+            });
+        }
+        registerMouseEvent() {
+            this.canvas.addEventListener('mousedown', this.handleMouseDown);
+            this.canvas.addEventListener('mouseup', this.handleMouseUp);
+            this.canvas.addEventListener('mousemove', this.handleMouseMove);
+        }
+        handleMouseDown(event) {
+            let pos = index_16.default.getOffset(event);
+            let hasSel = false;
+            this.shaps.forEach((s, i) => {
+                let { x, y, r } = s;
+                let clickR = Math.sqrt(Math.pow(pos.x - x, 2) + Math.pow(pos.y - y, 2));
+                if (clickR < r && !hasSel) {
+                    this.mouseDownPos = { x: pos.x, y: pos.y };
+                    this.isMouseDown = true;
+                    this.shapsStates[i].isSelected = true;
+                    hasSel = true;
+                }
+            });
+        }
+        handleMouseMove(event) {
+            if (this.isMouseDown) {
+                let pos = index_16.default.getOffset(event);
+                let offset = [pos.x - this.mouseDownPos.x, pos.y - this.mouseDownPos.y];
+                this.shapsStates.forEach((s, i) => {
+                    if (s.isSelected) {
+                        this.shaps[i].x += offset[0];
+                        this.shaps[i].y += offset[1];
+                    }
+                });
+            }
+        }
+        handleMouseUp(event) {
+            let i = this.shapsStates.length;
+            this.isMouseDown = false;
+            while (--i >= 0) {
+                if (this.shapsStates[i].isSelected) {
+                    this.shapsStates[i].isSelected = false;
+                    break;
+                }
+            }
+        }
+        move(ctx) {
+            if (this.isStop)
+                return;
+            window.requestAnimationFrame(_ => {
+                let { shaps, shapsStates } = this;
+                index_15.clear(ctx);
+                shaps.forEach((shap, i) => {
+                    let ss = shapsStates[i];
+                    let { isSelected, vx, vy, gravity, friction } = ss;
+                    console.log("move", ss);
+                    if (!isSelected) {
+                        shap.x += vx;
+                        shap.y += vy;
+                        ss.vx += (vx > 0 ? -friction * 0.2 : friction * 0.2);
+                        ss.vy += gravity;
+                        ss.vy += (vy > 0 ? -friction : friction);
+                        index_16.boxBounce(shap, ss, index_15.W, index_15.H);
+                    }
+                    shap.render(ctx);
+                });
+                this.move(ctx);
+            });
+        }
+    }
+    exports.default = Throw;
+});
+define("ts/index", ["require", "exports", "ts/draw/index", "ts/shap/arrow", "ts/shap/ball", "ts/interactive/throw"], function (require, exports, draw, arrow_1, ball_1, throw_1) {
+    "use strict";
+    Object.defineProperty(exports, "__esModule", { value: true });
     draw = __importStar(draw);
     arrow_1 = __importDefault(arrow_1);
+    throw_1 = __importDefault(throw_1);
     function init(e) {
         let canvas = document.getElementById("canvas");
         let ctx = canvas.getContext("2d");
         let arrow = new arrow_1.default({ x: draw.W / 2, y: draw.H / 6 });
-        let ball = new ball_1.Ball({ x: draw.W / 2, y: draw.H / 2, r: 30 });
+        let balls = new Array(120);
+        for (let i = 0; i < balls.length; i++) {
+            balls[i] = new ball_1.Ball({ x: draw.W * Math.random(), y: draw.H * Math.random(), r: 30 });
+        }
+        let throwIns = new throw_1.default([balls[0]], canvas);
         // let slide = new Slide([ball]);
-        let circle = new circle_1.Circle([ball, arrow]);
-        let oval = new oval_1.Oval([ball, arrow]);
-        let vec = new vectorAnimation_1.VectorAnimation({
-            shaps: [ball],
-            vectors: [new index_14.Vector({
-                    vx: 0.5,
-                    vy: 0.5,
-                    angle: 1
-                })]
-        });
-        let flow = new flow_1.FlowAnimation({ shaps: [arrow] });
-        let gravity = new gravity_1.GravityAnimation({ shaps: [ball] });
-        canvas === null || canvas === void 0 ? void 0 : canvas.addEventListener("mousemove", function (e) {
-            let pos = index_13.default.getOffset(e);
-            let dx = pos.x - draw.W / 2;
-            let dy = pos.y - draw.H / 2;
-            let rad = Math.atan2(dy, dx);
-            let angle = Math.atan(dy / dx) * 180 / Math.PI;
-            let angle2 = Math.atan2(dy, dx) * 180 / Math.PI;
-            let res = `x: ${dx} , y: ${dy}`;
-            let res2 = `angle : ${angle} `;
-            let res3 = `angle2 : ${angle2}`;
-            draw.clear(ctx);
-            ctx.fillText(rad + `   dx:${dx}, dy:${dy}`, pos.x + 10, pos.y);
-            ctx.fillText(res2, pos.x + 10, pos.y + 20);
-            ctx.fillText(res3, pos.x + 10, pos.y + 40);
-            flow.x = pos.x;
-            flow.y = pos.y;
-            draw.drawSystem(ctx);
-        });
-        canvas.addEventListener("click", e => {
-            draw.clear(ctx);
-        });
+        // let circle = new Circle([ball, arrow]);
+        // let oval = new Oval([ball, arrow]);
+        // let vec = new VectorAnimation({
+        //   shaps: [ball],
+        //   vectors: [new Vector({
+        //     vx: 0.5,
+        //     vy: 0.5,
+        //     angle: 1
+        //   })]
+        // })
+        // let flow = new FlowAnimation({ shaps: [arrow] });
+        // let gravity = new GravityAnimation({ shaps:balls });
+        // let foutain = new FountainAnimation({shaps:balls});
+        // canvas?.addEventListener("mousemove", function (e) {
+        //   let pos = utils.getOffset(e);
+        //   let dx = pos.x - draw.W / 2;
+        //   let dy = pos.y - draw.H / 2;
+        //   let rad = Math.atan2(dy, dx)
+        //   let angle = Math.atan(dy / dx) * 180 / Math.PI;
+        //   let angle2 = Math.atan2(dy, dx) * 180 / Math.PI;
+        //   let res = `x: ${dx} , y: ${dy}`
+        //   let res2 = `angle : ${angle} `
+        //   let res3 = `angle2 : ${angle2}`
+        //   draw.clear(ctx);
+        //   ctx.fillText(rad + `   dx:${dx}, dy:${dy}`, pos.x + 10, pos.y);
+        //   ctx.fillText(res2, pos.x + 10, pos.y + 20);
+        //   ctx.fillText(res3, pos.x + 10, pos.y + 40);
+        //   flow.x = pos.x;
+        //   flow.y = pos.y;
+        //   draw.drawSystem(ctx);
+        // })
+        // canvas.addEventListener("click", e => {
+        //   draw.clear(ctx);
+        // })
         draw.initDraw(canvas);
         // slide.move(ctx);
         // circle.move(ctx);
         // oval.move(ctx);
         // vec.move(ctx);
         // flow.move(ctx);
-        gravity.move(ctx);
-        console.log(gravity);
-        console.log("canvas init");
+        // gravity.move(ctx);
+        // foutain.move(ctx);
+        throwIns.move(ctx);
     }
     exports.default = init;
 });

@@ -11,7 +11,7 @@ export class GravityAnimation extends BaseAnimation {
         this.propertyInit(option);
         this.shapsStates = Array(this.shaps.length);
         for (let i = 0; i < this.shaps.length; i++) {
-            this.shapsStates[i] = { vy: 0 };
+            this.shapsStates[i] = { vy: 0, isStop: false };
         }
     }
 
@@ -23,12 +23,18 @@ export class GravityAnimation extends BaseAnimation {
             for (let i = 0; i < shaps.length; i++) {
                 let s = shaps[i];
                 let ss = shapsStates[i];
-
-                s.y += ss.vy;
-                ss.vy += gravity;
-                if (s.y + s.r >= H) {
-                    s.y =  H - s.r;
-                    ss.vy *= -0.8;
+                if (!ss.isStop) {
+                    s.y += ss.vy;
+                    ss.vy += gravity;
+                    if (s.y + s.r >= H) {
+                        s.y = H - s.r - 1;
+                        ss.vy *= -0.8;
+                        if(i == 0) console.log(ss)
+                        if(ss.vy < 0 && Math.abs(ss.vy) < 2){
+                            ss.vy = 0;
+                            ss.isStop = true;
+                        }
+                    }
                 }
                 s.render(ctx);
             }
