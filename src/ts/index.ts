@@ -1,4 +1,5 @@
 import utils from "./utils/index";
+import { H, W } from "./draw/index"
 import * as draw from "./draw/index";
 import Arrow from "./shap/arrow";
 import { Ball } from './shap/ball';
@@ -10,17 +11,25 @@ import { Vector } from "./vector/index"
 import { FlowAnimation } from "./animation/flow";
 import { GravityAnimation } from "./animation/gravity";
 import { FountainAnimation } from './animation/fountain';
+import { EaseAnimation } from './animation/ease';
+import { SpringAnimation } from './animation/spring';
 import Throw from './interactive/throw';
+import Spring from './interactive/spring';
+import Struct from './interactive/struct';
 
 export default function init(e: Event) {
   let canvas = <HTMLCanvasElement>document.getElementById("canvas");
   let ctx = <CanvasRenderingContext2D>canvas.getContext("2d");
   let arrow = new Arrow({ x: draw.W / 2, y: draw.H / 6 });
   let balls = new Array(120);
-  for(let i=0;i<balls.length;i++){
+  for (let i = 0; i < balls.length; i++) {
     balls[i] = new Ball({ x: draw.W * Math.random(), y: draw.H * Math.random(), r: 30 });
   }
-  let throwIns = new Throw([balls[0]],canvas);
+  let ease = new EaseAnimation([balls[0]], [W / 2, H / 2]);
+  let spring = new SpringAnimation([balls[2]], [W / 2, H / 2]);
+  let springInt = new Spring([balls[0]], canvas);
+  let structIns = new Struct(balls.slice(0, 5), canvas);
+  // let throwIns = new Throw([balls[0]],canvas);
   // let slide = new Slide([ball]);
   // let circle = new Circle([ball, arrow]);
   // let oval = new Oval([ball, arrow]);
@@ -68,6 +77,10 @@ export default function init(e: Event) {
   // flow.move(ctx);
   // gravity.move(ctx);
   // foutain.move(ctx);
-  throwIns.move(ctx);
+  // throwIns.move(ctx);
+  // ease.move(ctx);
+  // spring.move(ctx);
+  // springInt.move(ctx);
+  structIns.move(ctx);
 }
 

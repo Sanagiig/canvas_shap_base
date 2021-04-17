@@ -55,3 +55,24 @@ export function boxBounce(shap: BallInstance, state: ShapState, w: number, h: nu
     if (vy < 0) yBounce();
   }
 }
+
+export function getDistance(x1:number,y1:number,x2:number,y2:number){
+  const dx = x2 - x1 , dy = y2 - y1;
+  return Math.sqrt(dx * dx + dy * dy);
+}
+
+type eventFn = 'addEventListener' | 'removeEventListener';
+export function eventRegister(elm: HTMLElement, eventMap: ClsEventMap, isRemove?: boolean) {
+  let disName: string = isRemove ? 'removeEventListener' : 'addEventListener';
+
+  (<EventName[]>Object.keys(eventMap)).forEach(eName => {
+    let fns: any = (<any>eventMap)[eName];
+    if (fns instanceof Array) {
+      fns.forEach(fn => {
+        elm[<eventFn>disName](eName, fn);
+      })
+    } else {
+      elm[<eventFn>disName](eName, fns);
+    }
+  })
+}

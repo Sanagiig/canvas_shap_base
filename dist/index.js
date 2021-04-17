@@ -24,7 +24,7 @@ var __importStar = (this && this.__importStar) || function (mod) {
 define("ts/utils/index", ["require", "exports"], function (require, exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
-    exports.boxBounce = exports.isInBox = exports.propertyInit = void 0;
+    exports.eventRegister = exports.getDistance = exports.boxBounce = exports.isInBox = exports.propertyInit = void 0;
     exports.default = {
         getOffset(event) {
             return this.eventWraper(event);
@@ -89,6 +89,26 @@ define("ts/utils/index", ["require", "exports"], function (require, exports) {
         }
     }
     exports.boxBounce = boxBounce;
+    function getDistance(x1, y1, x2, y2) {
+        const dx = x2 - x1, dy = y2 - y1;
+        return Math.sqrt(dx * dx + dy * dy);
+    }
+    exports.getDistance = getDistance;
+    function eventRegister(elm, eventMap, isRemove) {
+        let disName = isRemove ? 'removeEventListener' : 'addEventListener';
+        Object.keys(eventMap).forEach(eName => {
+            let fns = eventMap[eName];
+            if (fns instanceof Array) {
+                fns.forEach(fn => {
+                    elm[disName](eName, fn);
+                });
+            }
+            else {
+                elm[disName](eName, fns);
+            }
+        });
+    }
+    exports.eventRegister = eventRegister;
 });
 define("ts/draw/index", ["require", "exports"], function (require, exports) {
     "use strict";
@@ -557,10 +577,82 @@ define("ts/animation/fountain", ["require", "exports", "ts/animation/base", "ts/
     }
     exports.FountainAnimation = FountainAnimation;
 });
-define("ts/interactive/throw", ["require", "exports", "ts/draw/index", "ts/utils/index"], function (require, exports, index_15, index_16) {
+define("ts/animation/ease", ["require", "exports", "ts/draw/index"], function (require, exports, index_15) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
-    index_16 = __importStar(index_16);
+    exports.EaseAnimation = void 0;
+    class EaseAnimation {
+        constructor(shaps, target, ease = 0.05) {
+            this.shaps = [];
+            this.shapsStates = [];
+            this.shaps = shaps;
+            this.target = target;
+            this.ease = ease;
+            this.shapsStates = new Array(shaps.length);
+        }
+        move(ctx) {
+            requestAnimationFrame(_ => {
+                let { shapsStates, shaps, target, ease } = this;
+                index_15.clear(ctx);
+                shaps.forEach((s, i) => {
+                    let ss = shapsStates[i] = shapsStates[i] || {};
+                    let dx = target[0] - s.x, dy = target[1] - s.y;
+                    ss.vx = dx * ease;
+                    ss.vy = dy * ease;
+                    s.x += ss.vx;
+                    s.y += ss.vy;
+                    s.render(ctx);
+                });
+                this.move(ctx);
+            });
+        }
+    }
+    exports.EaseAnimation = EaseAnimation;
+});
+define("ts/animation/spring", ["require", "exports", "ts/draw/index"], function (require, exports, index_16) {
+    "use strict";
+    Object.defineProperty(exports, "__esModule", { value: true });
+    exports.SpringAnimation = void 0;
+    class SpringAnimation {
+        constructor(shaps, target, spring = 0.02, friction = 0.98) {
+            this.shaps = [];
+            this.shapsStates = [];
+            this.shaps = shaps;
+            this.target = target;
+            this.spring = spring;
+            this.friction = friction;
+            this.shapsStates = new Array(shaps.length);
+        }
+        move(ctx) {
+            requestAnimationFrame(_ => {
+                let { shapsStates, shaps, target, spring, friction } = this;
+                index_16.clear(ctx);
+                shaps.forEach((s, i) => {
+                    let ss = shapsStates[i] = shapsStates[i] || {
+                        vy: 0, vx: 0
+                    };
+                    let dx = target[0] - s.x, dy = target[1] - s.y;
+                    // let fx = dx < 0 ?friction : -friction 
+                    // let fy = dy < 0 ?friction : -friction 
+                    let ax = dx * spring, ay = dy * spring;
+                    ss.vx += ax;
+                    ss.vy += ay;
+                    ss.vx *= friction;
+                    ss.vy *= friction;
+                    s.x += ss.vx;
+                    s.y += ss.vy;
+                    s.render(ctx);
+                });
+                this.move(ctx);
+            });
+        }
+    }
+    exports.SpringAnimation = SpringAnimation;
+});
+define("ts/interactive/throw", ["require", "exports", "ts/draw/index", "ts/utils/index"], function (require, exports, index_17, index_18) {
+    "use strict";
+    Object.defineProperty(exports, "__esModule", { value: true });
+    index_18 = __importStar(index_18);
     class Throw {
         constructor(shaps, canvas) {
             this.shaps = [];
@@ -572,6 +664,11 @@ define("ts/interactive/throw", ["require", "exports", "ts/draw/index", "ts/utils
             this.isStop = false;
             this.canvas = canvas;
             this.shaps = shaps.slice();
+            this.eventMap = {
+                mousedown: this.handleMouseDown.bind(this),
+                mouseup: this.handleMouseUp.bind(this),
+                mousemove: this.handleMouseMove.bind(this),
+            };
             this.shapsStates = shaps.map(s => {
                 let ram = Math.random();
                 let bx = 10;
@@ -585,18 +682,25 @@ define("ts/interactive/throw", ["require", "exports", "ts/draw/index", "ts/utils
                     isSelected: false,
                 };
             });
+            this.registerMouseEvent();
+        }
+        godie() {
+            this.removeMouseEvent();
         }
         registerMouseEvent() {
-            this.canvas.addEventListener('mousedown', this.handleMouseDown);
-            this.canvas.addEventListener('mouseup', this.handleMouseUp);
-            this.canvas.addEventListener('mousemove', this.handleMouseMove);
+            index_18.eventRegister(this.canvas, this.eventMap);
+        }
+        removeMouseEvent() {
+            index_18.eventRegister(this.canvas, this.eventMap, true);
         }
         handleMouseDown(event) {
-            let pos = index_16.default.getOffset(event);
+            let pos = index_18.default.getOffset(event);
             let hasSel = false;
+            console.log(pos);
             this.shaps.forEach((s, i) => {
                 let { x, y, r } = s;
                 let clickR = Math.sqrt(Math.pow(pos.x - x, 2) + Math.pow(pos.y - y, 2));
+                console.log(pos, clickR);
                 if (clickR < r && !hasSel) {
                     this.mouseDownPos = { x: pos.x, y: pos.y };
                     this.isMouseDown = true;
@@ -607,22 +711,30 @@ define("ts/interactive/throw", ["require", "exports", "ts/draw/index", "ts/utils
         }
         handleMouseMove(event) {
             if (this.isMouseDown) {
-                let pos = index_16.default.getOffset(event);
-                let offset = [pos.x - this.mouseDownPos.x, pos.y - this.mouseDownPos.y];
-                this.shapsStates.forEach((s, i) => {
-                    if (s.isSelected) {
-                        this.shaps[i].x += offset[0];
-                        this.shaps[i].y += offset[1];
+                let { shapsStates, mouseDownPos, shaps } = this;
+                let pos = index_18.default.getOffset(event);
+                let offset = [pos.x - mouseDownPos.x, pos.y - mouseDownPos.y];
+                shapsStates.forEach((ss, i) => {
+                    if (ss.isSelected) {
+                        let s = this.shaps[i];
+                        s.x += offset[0];
+                        s.y += offset[1];
+                        ss.vx = (pos.x - mouseDownPos.x) * 4;
+                        ss.vy = (pos.y - mouseDownPos.y) * 4;
+                        mouseDownPos.x = pos.x;
+                        mouseDownPos.y = pos.y;
                     }
                 });
             }
         }
         handleMouseUp(event) {
+            let { shapsStates } = this;
             let i = this.shapsStates.length;
             this.isMouseDown = false;
             while (--i >= 0) {
-                if (this.shapsStates[i].isSelected) {
-                    this.shapsStates[i].isSelected = false;
+                let ss = shapsStates[i];
+                if (ss.isSelected) {
+                    ss.isSelected = false;
                     break;
                 }
             }
@@ -632,18 +744,17 @@ define("ts/interactive/throw", ["require", "exports", "ts/draw/index", "ts/utils
                 return;
             window.requestAnimationFrame(_ => {
                 let { shaps, shapsStates } = this;
-                index_15.clear(ctx);
+                index_17.clear(ctx);
                 shaps.forEach((shap, i) => {
                     let ss = shapsStates[i];
                     let { isSelected, vx, vy, gravity, friction } = ss;
-                    console.log("move", ss);
                     if (!isSelected) {
                         shap.x += vx;
                         shap.y += vy;
                         ss.vx += (vx > 0 ? -friction * 0.2 : friction * 0.2);
                         ss.vy += gravity;
                         ss.vy += (vy > 0 ? -friction : friction);
-                        index_16.boxBounce(shap, ss, index_15.W, index_15.H);
+                        index_18.boxBounce(shap, ss, index_17.W, index_17.H);
                     }
                     shap.render(ctx);
                 });
@@ -653,12 +764,228 @@ define("ts/interactive/throw", ["require", "exports", "ts/draw/index", "ts/utils
     }
     exports.default = Throw;
 });
-define("ts/index", ["require", "exports", "ts/draw/index", "ts/shap/arrow", "ts/shap/ball", "ts/interactive/throw"], function (require, exports, draw, arrow_1, ball_1, throw_1) {
+define("ts/interactive/spring", ["require", "exports", "ts/draw/index", "ts/utils/index"], function (require, exports, index_19, index_20) {
+    "use strict";
+    Object.defineProperty(exports, "__esModule", { value: true });
+    index_20 = __importStar(index_20);
+    class Throw {
+        constructor(shaps, canvas) {
+            this.shaps = [];
+            this.shapsStates = [];
+            this.friction = 0.95;
+            this.gravity = 0.5;
+            this.spring = 0.02;
+            this.isMouseDown = false;
+            this.canvas = canvas;
+            this.shaps = shaps.slice();
+            this.eventMap = {
+                mousemove: this.handleMouseMove.bind(this),
+            };
+            this.shapsStates = shaps.map(s => {
+                return {
+                    vx: 0,
+                    vy: 0,
+                    targetX: s.x,
+                    targetY: s.y,
+                    spring: this.spring,
+                    gravity: this.gravity,
+                    friction: this.friction,
+                };
+            });
+            this.registerMouseEvent();
+        }
+        godie() {
+            this.removeMouseEvent();
+        }
+        registerMouseEvent() {
+            index_20.eventRegister(this.canvas, this.eventMap);
+        }
+        removeMouseEvent() {
+            index_20.eventRegister(this.canvas, this.eventMap, true);
+        }
+        handleMouseMove(event) {
+            let pos = index_20.default.getOffset(event);
+            this.shapsStates.forEach((ss, i) => {
+                ss.vx *= 0.5;
+                ss.vy *= 0.5;
+                ss.targetX = pos.x;
+                ss.targetY = pos.y;
+            });
+        }
+        move(ctx) {
+            window.requestAnimationFrame(_ => {
+                let { shaps, shapsStates } = this;
+                index_19.clear(ctx);
+                shaps.forEach((shap, i) => {
+                    let ss = shapsStates[i];
+                    let { gravity, friction, spring } = ss;
+                    let dx = ss.targetX - shap.x, dy = ss.targetY - shap.y;
+                    let ax = dx * spring, ay = dy * spring;
+                    ss.vx += ax;
+                    ss.vy += ay;
+                    ss.vx *= friction;
+                    ss.vy *= friction;
+                    ss.vy += gravity;
+                    shap.x += ss.vx;
+                    shap.y += ss.vy;
+                    ctx.save();
+                    ctx.lineWidth = 2;
+                    ctx.strokeStyle = "red";
+                    ctx.beginPath();
+                    ctx.lineTo(ss.targetX, ss.targetY);
+                    ctx.lineTo(shap.x, shap.y);
+                    ctx.stroke();
+                    ctx.restore();
+                    shap.render(ctx);
+                });
+                this.move(ctx);
+            });
+        }
+    }
+    exports.default = Throw;
+});
+define("ts/interactive/struct", ["require", "exports", "ts/draw/index", "ts/utils/index"], function (require, exports, index_21, index_22) {
+    "use strict";
+    Object.defineProperty(exports, "__esModule", { value: true });
+    index_22 = __importStar(index_22);
+    class Struct {
+        constructor(shaps, canvas) {
+            this.shaps = [];
+            this.shapsStates = [];
+            this.friction = 0.95;
+            this.gravity = 0.5;
+            this.spring = 0.02;
+            this.springLen = 200;
+            this.isMouseDown = false;
+            let { springLen } = this;
+            this.canvas = canvas;
+            this.shaps = shaps.slice();
+            this.eventMap = {
+                mousedown: this.handleMouseDown.bind(this),
+                mousemove: this.handleMouseMove.bind(this),
+                mouseup: this.handleMouseUp.bind(this),
+            };
+            this.shapsStates = shaps.map((s, i) => {
+                let x, y;
+                if (i === 0) {
+                    x = s.x;
+                    y = s.y;
+                }
+                else {
+                    let angle = 2 * Math.PI * Math.random();
+                    let lx = shaps[i - 1].x, ly = shaps[i - 1].y;
+                    s.x = x = Math.cos(angle) * springLen + lx;
+                    s.y = y = Math.sin(angle) * springLen + ly;
+                    let dx = x - lx, dy = y - ly;
+                    let dis = Math.sqrt(dx * dx + dy * dy);
+                    console.log("angle", angle, Math.atan2(y, x), y / x, dis);
+                }
+                return {
+                    vx: 0,
+                    vy: 0,
+                    offsetX: 0,
+                    offsetY: 0,
+                    x: x,
+                    y: y,
+                    spring: this.spring,
+                    gravity: this.gravity,
+                    friction: this.friction,
+                    isMouseDown: false,
+                };
+            });
+            this.registerMouseEvent();
+        }
+        godie() {
+            this.removeMouseEvent();
+        }
+        registerMouseEvent() {
+            index_22.eventRegister(this.canvas, this.eventMap);
+        }
+        removeMouseEvent() {
+            index_22.eventRegister(this.canvas, this.eventMap, true);
+        }
+        handleMouseDown(event) {
+            let pos = index_22.default.getOffset(event);
+            let i = this.shaps.length;
+            while (--i >= 0) {
+                let s = this.shaps[i];
+                let ss = this.shapsStates[i];
+                let distance = index_22.getDistance(pos.x, pos.y, s.x, s.y);
+                if (distance <= s.r) {
+                    ss.isMouseDown = true;
+                    ss.offsetX = pos.x - s.x;
+                    ss.offsetY = pos.y - s.y;
+                    break;
+                }
+            }
+            this.isMouseDown = true;
+        }
+        handleMouseMove(event) {
+            if (this.isMouseDown) {
+                let pos = index_22.default.getOffset(event);
+                this.shapsStates.forEach((ss, i) => {
+                    ss.vx *= 0.5;
+                    ss.vy *= 0.5;
+                    ss.x = pos.x;
+                    ss.y = pos.y;
+                });
+            }
+        }
+        handleMouseUp(event) {
+            this.shapsStates.forEach((ss, i) => {
+                ss.isMouseDown = false;
+            });
+        }
+        drawLine(ctx, shaps) {
+            let { shapsStates } = this;
+            shaps.forEach((shap, i) => {
+                let ss = shapsStates[i];
+                let pre = i === 0 ? shaps.length - 1 : i - 1;
+                let preShap = shaps[pre];
+                ctx.save();
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = "red";
+                ctx.beginPath();
+                ctx.lineTo(preShap.x, preShap.y);
+                ctx.lineTo(shap.x, shap.y);
+                ctx.stroke();
+                ctx.restore();
+            });
+        }
+        move(ctx) {
+            window.requestAnimationFrame(_ => {
+                let { shaps, shapsStates } = this;
+                index_21.clear(ctx);
+                this.drawLine(ctx, shaps);
+                shaps.forEach((shap, i) => {
+                    let ss = shapsStates[i];
+                    if (ss.isMouseDown) {
+                        let { gravity, friction, spring } = ss;
+                        let dx = ss.x - shap.x, dy = ss.y - shap.y;
+                        let ax = dx * spring, ay = dy * spring;
+                        ss.vx += ax;
+                        ss.vy += ay;
+                        ss.vx *= friction;
+                        ss.vy *= friction;
+                        ss.vy += gravity;
+                        shap.x = ss.x - ss.offsetX;
+                        shap.y = ss.y - ss.offsetY;
+                    }
+                    shap.render(ctx);
+                });
+                this.move(ctx);
+            });
+        }
+    }
+    exports.default = Struct;
+});
+define("ts/index", ["require", "exports", "ts/draw/index", "ts/draw/index", "ts/shap/arrow", "ts/shap/ball", "ts/animation/ease", "ts/animation/spring", "ts/interactive/spring", "ts/interactive/struct"], function (require, exports, index_23, draw, arrow_1, ball_1, ease_1, spring_1, spring_2, struct_1) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     draw = __importStar(draw);
     arrow_1 = __importDefault(arrow_1);
-    throw_1 = __importDefault(throw_1);
+    spring_2 = __importDefault(spring_2);
+    struct_1 = __importDefault(struct_1);
     function init(e) {
         let canvas = document.getElementById("canvas");
         let ctx = canvas.getContext("2d");
@@ -667,7 +994,11 @@ define("ts/index", ["require", "exports", "ts/draw/index", "ts/shap/arrow", "ts/
         for (let i = 0; i < balls.length; i++) {
             balls[i] = new ball_1.Ball({ x: draw.W * Math.random(), y: draw.H * Math.random(), r: 30 });
         }
-        let throwIns = new throw_1.default([balls[0]], canvas);
+        let ease = new ease_1.EaseAnimation([balls[0]], [index_23.W / 2, index_23.H / 2]);
+        let spring = new spring_1.SpringAnimation([balls[2]], [index_23.W / 2, index_23.H / 2]);
+        let springInt = new spring_2.default([balls[0]], canvas);
+        let structIns = new struct_1.default(balls.slice(0, 5), canvas);
+        // let throwIns = new Throw([balls[0]],canvas);
         // let slide = new Slide([ball]);
         // let circle = new Circle([ball, arrow]);
         // let oval = new Oval([ball, arrow]);
@@ -711,7 +1042,11 @@ define("ts/index", ["require", "exports", "ts/draw/index", "ts/shap/arrow", "ts/
         // flow.move(ctx);
         // gravity.move(ctx);
         // foutain.move(ctx);
-        throwIns.move(ctx);
+        // throwIns.move(ctx);
+        // ease.move(ctx);
+        // spring.move(ctx);
+        // springInt.move(ctx);
+        structIns.move(ctx);
     }
     exports.default = init;
 });
