@@ -5,3 +5,8 @@ declare interface verctorInstance {
     xStep: number;
     yStep: number;
 }
+
+declare type Position = {
+    x:number,
+    y:number
+}

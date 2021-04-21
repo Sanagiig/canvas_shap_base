@@ -24,7 +24,7 @@ var __importStar = (this && this.__importStar) || function (mod) {
 define("ts/utils/index", ["require", "exports"], function (require, exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
-    exports.eventRegister = exports.getDistance = exports.boxBounce = exports.isInBox = exports.propertyInit = void 0;
+    exports.getArrProxy = exports.eventRegister = exports.getDistance = exports.boxBounce = exports.isInBox = exports.propertyInit = void 0;
     exports.default = {
         getOffset(event) {
             return this.eventWraper(event);
@@ -109,6 +109,21 @@ define("ts/utils/index", ["require", "exports"], function (require, exports) {
         });
     }
     exports.eventRegister = eventRegister;
+    function getArrProxy(arr) {
+        return new Proxy(arr, {
+            get(target, index, receive) {
+                let len = target.length;
+                let idx_num = parseInt(index);
+                let i = idx_num >= len
+                    ? idx_num % len
+                    : idx_num < 0
+                        ? len + idx_num
+                        : idx_num;
+                return target[i];
+            }
+        });
+    }
+    exports.getArrProxy = getArrProxy;
 });
 define("ts/draw/index", ["require", "exports"], function (require, exports) {
     "use strict";
@@ -852,12 +867,8 @@ define("ts/interactive/struct", ["require", "exports", "ts/draw/index", "ts/util
         constructor(shaps, canvas) {
             this.shaps = [];
             this.shapsStates = [];
-            this.friction = 0.95;
-            this.gravity = 0.5;
-            this.spring = 0.02;
-            this.springLen = 200;
             this.isMouseDown = false;
-            let { springLen } = this;
+            let { springLen } = Struct;
             this.canvas = canvas;
             this.shaps = shaps.slice();
             this.eventMap = {
@@ -876,24 +887,47 @@ define("ts/interactive/struct", ["require", "exports", "ts/draw/index", "ts/util
                     let lx = shaps[i - 1].x, ly = shaps[i - 1].y;
                     s.x = x = Math.cos(angle) * springLen + lx;
                     s.y = y = Math.sin(angle) * springLen + ly;
-                    let dx = x - lx, dy = y - ly;
-                    let dis = Math.sqrt(dx * dx + dy * dy);
-                    console.log("angle", angle, Math.atan2(y, x), y / x, dis);
                 }
+                console.log({
+                    vx: 0,
+                    vy: 0,
+                    offsetX: 0,
+                    offsetY: 0,
+                    targetX: x,
+                    targetY: y,
+                    x: x,
+                    y: y,
+                    spring: Struct.spring,
+                    gravity: Struct.gravity,
+                    friction: Struct.friction,
+                    isMouseDown: false,
+                });
                 return {
                     vx: 0,
                     vy: 0,
                     offsetX: 0,
                     offsetY: 0,
+                    targetX: x,
+                    targetY: y,
                     x: x,
                     y: y,
-                    spring: this.spring,
-                    gravity: this.gravity,
-                    friction: this.friction,
+                    spring: Struct.spring,
+                    gravity: Struct.gravity,
+                    friction: Struct.friction,
                     isMouseDown: false,
                 };
             });
             this.registerMouseEvent();
+        }
+        static genTarget(p1, p2) {
+            let { springLen } = Struct;
+            let x1 = p1.x, x2 = p2.x, y1 = p1.y, y2 = p2.y;
+            let dx = x2 - x1, dy = y2 - y1;
+            let angle = Math.atan2(dy, dx);
+            return {
+                x: x1 + springLen * Math.cos(angle),
+                y: y1 + springLen * Math.sin(angle)
+            };
         }
         godie() {
             this.removeMouseEvent();
@@ -921,20 +955,41 @@ define("ts/interactive/struct", ["require", "exports", "ts/draw/index", "ts/util
             this.isMouseDown = true;
         }
         handleMouseMove(event) {
-            if (this.isMouseDown) {
-                let pos = index_22.default.getOffset(event);
-                this.shapsStates.forEach((ss, i) => {
-                    ss.vx *= 0.5;
-                    ss.vy *= 0.5;
-                    ss.x = pos.x;
-                    ss.y = pos.y;
-                });
+            let { shapsStates, shaps } = this;
+            let sProxy = index_22.getArrProxy(shaps), ssProxy = index_22.getArrProxy(shapsStates);
+            let pos = index_22.default.getOffset(event);
+            let len = shapsStates.length;
+            let curI, preI, nextI;
+            let tmpP1, tmpP2, tarPos;
+            let count = Math.floor(len / 2);
+            curI = preI = nextI = shapsStates.findIndex(item => item.isMouseDown);
+            if (preI > -1) {
+                let s = shaps[curI], ss = shapsStates[curI];
+                s.x = pos.x - ss.offsetX;
+                s.y = pos.y - ss.offsetY;
+                ss.targetX = pos.x;
+                ss.targetY = pos.y;
+                while (count--) {
+                    tmpP1 = sProxy[preI];
+                    tmpP2 = sProxy[--preI];
+                    tarPos = Struct.genTarget({ x: tmpP1.x, y: tmpP1.y }, { x: tmpP2.x, y: tmpP2.y });
+                    ssProxy[preI].targetX = tarPos.x;
+                    ssProxy[preI].targetY = tarPos.y;
+                    tmpP1 = sProxy[nextI];
+                    tmpP2 = sProxy[++nextI];
+                    tarPos = Struct.genTarget({ x: tmpP1.x, y: tmpP1.y }, { x: tmpP2.x, y: tmpP2.y });
+                    ssProxy[nextI].targetX = tarPos.x;
+                    ssProxy[nextI].targetY = tarPos.y;
+                }
             }
         }
         handleMouseUp(event) {
+            this.isMouseDown = false;
             this.shapsStates.forEach((ss, i) => {
                 ss.isMouseDown = false;
             });
+        }
+        spingOther(ss) {
         }
         drawLine(ctx, shaps) {
             let { shapsStates } = this;
@@ -959,18 +1014,15 @@ define("ts/interactive/struct", ["require", "exports", "ts/draw/index", "ts/util
                 this.drawLine(ctx, shaps);
                 shaps.forEach((shap, i) => {
                     let ss = shapsStates[i];
-                    if (ss.isMouseDown) {
-                        let { gravity, friction, spring } = ss;
-                        let dx = ss.x - shap.x, dy = ss.y - shap.y;
-                        let ax = dx * spring, ay = dy * spring;
-                        ss.vx += ax;
-                        ss.vy += ay;
-                        ss.vx *= friction;
-                        ss.vy *= friction;
-                        ss.vy += gravity;
-                        shap.x = ss.x - ss.offsetX;
-                        shap.y = ss.y - ss.offsetY;
-                    }
+                    let { spring, friction } = Struct;
+                    let { targetX, targetY } = ss;
+                    ss.vx += (targetX - shap.x) * spring;
+                    ss.vy += (targetY - shap.y) * spring;
+                    ss.vx *= friction;
+                    ss.vy *= friction;
+                    // console.log("vx",ss)
+                    shap.x += ss.vx;
+                    shap.y += ss.vy;
                     shap.render(ctx);
                 });
                 this.move(ctx);
@@ -978,6 +1030,10 @@ define("ts/interactive/struct", ["require", "exports", "ts/draw/index", "ts/util
         }
     }
     exports.default = Struct;
+    Struct.springLen = 200;
+    Struct.friction = 0.95;
+    Struct.gravity = 0.5;
+    Struct.spring = 0.02;
 });
 define("ts/index", ["require", "exports", "ts/draw/index", "ts/draw/index", "ts/shap/arrow", "ts/shap/ball", "ts/animation/ease", "ts/animation/spring", "ts/interactive/spring", "ts/interactive/struct"], function (require, exports, index_23, draw, arrow_1, ball_1, ease_1, spring_1, spring_2, struct_1) {
     "use strict";
@@ -997,7 +1053,7 @@ define("ts/index", ["require", "exports", "ts/draw/index", "ts/draw/index", "ts/
         let ease = new ease_1.EaseAnimation([balls[0]], [index_23.W / 2, index_23.H / 2]);
         let spring = new spring_1.SpringAnimation([balls[2]], [index_23.W / 2, index_23.H / 2]);
         let springInt = new spring_2.default([balls[0]], canvas);
-        let structIns = new struct_1.default(balls.slice(0, 5), canvas);
+        let structIns = new struct_1.default(balls.slice(0, 10), canvas);
         // let throwIns = new Throw([balls[0]],canvas);
         // let slide = new Slide([ball]);
         // let circle = new Circle([ball, arrow]);

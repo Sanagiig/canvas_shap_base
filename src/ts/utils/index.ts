@@ -2,7 +2,7 @@ export default {
   getOffset(event: MouseEvent) {
     return this.eventWraper(event);
   },
-  eventWraper(event: MouseEvent) {
+  eventWraper(event: MouseEvent): Position {
     let { pageX, pageY, target } = event;
     let { left, top } = (<Element>target).getBoundingClientRect();
     return { x: pageX - left, y: pageY - top };
@@ -56,8 +56,8 @@ export function boxBounce(shap: BallInstance, state: ShapState, w: number, h: nu
   }
 }
 
-export function getDistance(x1:number,y1:number,x2:number,y2:number){
-  const dx = x2 - x1 , dy = y2 - y1;
+export function getDistance(x1: number, y1: number, x2: number, y2: number) {
+  const dx = x2 - x1, dy = y2 - y1;
   return Math.sqrt(dx * dx + dy * dy);
 }
 
@@ -73,6 +73,22 @@ export function eventRegister(elm: HTMLElement, eventMap: ClsEventMap, isRemove?
       })
     } else {
       elm[<eventFn>disName](eName, fns);
+    }
+  })
+}
+
+export function getArrProxy(arr: any[]) {
+  return new Proxy(arr, {
+    get(target, index, receive) {
+      let len = target.length;
+      let idx_num = parseInt(index as string);
+      let i: number = idx_num >= len
+        ? idx_num % len
+        : idx_num < 0
+          ? len + idx_num
+          : idx_num;
+
+      return target[i];
     }
   })
 }

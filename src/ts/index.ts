@@ -28,7 +28,7 @@ export default function init(e: Event) {
   let ease = new EaseAnimation([balls[0]], [W / 2, H / 2]);
   let spring = new SpringAnimation([balls[2]], [W / 2, H / 2]);
   let springInt = new Spring([balls[0]], canvas);
-  let structIns = new Struct(balls.slice(0, 5), canvas);
+  let structIns = new Struct(balls.slice(0, 10), canvas);
   // let throwIns = new Throw([balls[0]],canvas);
   // let slide = new Slide([ball]);
   // let circle = new Circle([ball, arrow]);
@@ -83,4 +83,3 @@ export default function init(e: Event) {
   // springInt.move(ctx);
   structIns.move(ctx);
 }
-

@@ -1,5 +1,5 @@
 import { clear, H, W, drawLine } from '../draw/index';
-import utils, { isInBox, getDistance, eventRegister } from '../utils/index';
+import utils, { isInBox, getDistance, eventRegister, getArrProxy } from '../utils/index';
 export default class Struct {
   static springLen: number = 200;
   static friction: number = 0.95;
@@ -12,15 +12,15 @@ export default class Struct {
   canvas: HTMLElement;
   eventMap: ClsEventMap;
 
-  static disposeSpring(ss1: any, ss2: any) {
-    let { springLen ,spring} = Struct;
-    let x1 = ss1.x, x2 = ss2.x, y1 = ss1.y, y2 = ss2.y;
+  static genTarget(p1: Position, p2: Position) {
+    let { springLen } = Struct;
+    let x1 = p1.x, x2 = p2.x, y1 = p1.y, y2 = p2.y;
     let dx = x2 - x1, dy = y2 - y1;
     let angle = Math.atan2(dy, dx);
-    let targetX = x1 - springLen * Math.cos(angle);
-    let targetY = y1 - springLen * Math.cos(angle);
-    ss2.vx += targetX * spring;
-    ss2.vy += targetY * spring;
+    return {
+      x: x1 + springLen * Math.cos(angle),
+      y: y1 + springLen * Math.sin(angle)
+    }
   }
 
   constructor(shaps: BallInstance[], canvas: HTMLElement) {
@@ -43,12 +43,27 @@ export default class Struct {
         s.x = x = Math.cos(angle) * springLen + lx;
         s.y = y = Math.sin(angle) * springLen + ly;
       }
-
+      console.log({
+        vx: 0,
+        vy: 0,
+        offsetX: 0,
+        offsetY: 0,
+        targetX: x,
+        targetY: y,
+        x: x,
+        y: y,
+        spring: Struct.spring,
+        gravity: Struct.gravity,
+        friction: Struct.friction,
+        isMouseDown: false,
+      })
       return {
         vx: 0,
         vy: 0,
         offsetX: 0,
         offsetY: 0,
+        targetX: x,
+        targetY: y,
         x: x,
         y: y,
         spring: Struct.spring,
@@ -86,21 +101,36 @@ export default class Struct {
     this.isMouseDown = true;
   }
   handleMouseMove(event: MouseEvent) {
-    let { shapsStates } = this;
+    let { shapsStates, shaps } = this;
+    let sProxy = getArrProxy(shaps), ssProxy = getArrProxy(shapsStates);
     let pos = utils.getOffset(event);
-    let lastNum = shapsStates.length - 1;
-    this.shapsStates.forEach((ss, i) => {
-      let preI = i - 1 < 0 ? lastNum : i - 1;
-      let nexI = i + 1 < lastNum ? i + 1 : 0;
-      let pss = shapsStates[preI], nss = shapsStates[nexI];
+    let len = shapsStates.length;
+    let curI, preI, nextI;
+    let tmpP1, tmpP2, tarPos;
+    let count = Math.floor(len / 2);
+    curI = preI = nextI = shapsStates.findIndex(item => item.isMouseDown);
 
-      if (ss.isMouseDown) {
-        ss.x = pos.x;
-        ss.y = pos.y;
-        Struct.disposeSpring(ss,pss);
-        Struct.disposeSpring(ss,nss);
+    if (preI > -1) {
+      let s = shaps[curI],ss = shapsStates[curI];
+
+      s.x = pos.x - ss.offsetX;
+      s.y = pos.y - ss.offsetY;
+      ss.targetX = pos.x;
+      ss.targetY = pos.y;
+      while (count--) {
+        tmpP1 = sProxy[preI];
+        tmpP2 = sProxy[--preI];
+        tarPos = Struct.genTarget({ x: tmpP1.x, y: tmpP1.y }, { x: tmpP2.x, y: tmpP2.y });
+        ssProxy[preI].targetX = tarPos.x;
+        ssProxy[preI].targetY = tarPos.y;
+
+        tmpP1 = sProxy[nextI];
+        tmpP2 = sProxy[++nextI];
+        tarPos = Struct.genTarget({ x: tmpP1.x, y: tmpP1.y }, { x: tmpP2.x, y: tmpP2.y });
+        ssProxy[nextI].targetX = tarPos.x;
+        ssProxy[nextI].targetY = tarPos.y;
       }
-    })
+    }
   }
 
   handleMouseUp(event: MouseEvent) {
@@ -109,7 +139,7 @@ export default class Struct {
       ss.isMouseDown = false;
     })
   }
-  spingOther(ss:any){
+  spingOther(ss: any) {
 
   }
   drawLine(ctx: CanvasRenderingContext2D, shaps: BallInstance[]) {
@@ -133,29 +163,23 @@ export default class Struct {
   move(ctx: CanvasRenderingContext2D) {
     window.requestAnimationFrame(_ => {
       let { shaps, shapsStates } = this;
-      let selss;
       clear(ctx);
 
       this.drawLine(ctx, shaps);
       shaps.forEach((shap, i) => {
         let ss = shapsStates[i];
-        let { gravity, friction, spring } = ss;
-        if (ss.isMouseDown) {
-          let dx = ss.x - shap.x, dy = ss.y - shap.y;
-          let ax = dx * spring, ay = dy * spring;
-          selss = ss;
-          ss.vx += ax;
-          ss.vy += ay;
+        let { spring, friction } = Struct;
+        let { targetX, targetY } = ss;
 
-          ss.vx *= friction;
-          ss.vy *= friction;
-          ss.vy += gravity;
+        ss.vx += (targetX - shap.x) * spring;
+        ss.vy += (targetY - shap.y) * spring;
 
-          shap.x = ss.x - ss.offsetX;
-          shap.y = ss.y - ss.offsetY;
-        }else{
-          Struct
-        }
+        ss.vx *= friction;
+        ss.vy *= friction;
+        // console.log("vx",ss)
+        shap.x += ss.vx;
+        shap.y += ss.vy;
+
         shap.render(ctx);
       })
 
