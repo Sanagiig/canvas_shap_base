@@ -1,19 +1,22 @@
 import { Shap } from './base';
-export class Ball extends Shap {
-  public r = 20;
+export class Rect extends Shap {
+
   constructor(option: any) {
     super(option);
   }
+
   render(ctx: CanvasRenderingContext2D) {
-    let { fillStyle, strokeStyle, x, y, r, scaleX, scaleY, alpha } = this;
+    let { x, y, translateX, translateY,
+      width, height,
+      fillStyle, strokeStyle, scaleX, scaleY, alpha } = this;
     ctx.save();
     ctx.fillStyle = fillStyle;
     ctx.strokeStyle = strokeStyle;
-    ctx.translate(x, y);
+    ctx.translate(translateX, translateY);
     ctx.scale(scaleX, scaleY);
     ctx.globalAlpha = alpha;
     ctx.beginPath();
-    ctx.arc(0, 0, r, 0, 2 * Math.PI);
+    ctx.rect(x,y,width,height);
     ctx.closePath();
     ctx.fill();
     ctx.stroke();

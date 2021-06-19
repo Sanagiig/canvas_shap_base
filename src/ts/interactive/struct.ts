@@ -43,20 +43,6 @@ export default class Struct {
         s.x = x = Math.cos(angle) * springLen + lx;
         s.y = y = Math.sin(angle) * springLen + ly;
       }
-      console.log({
-        vx: 0,
-        vy: 0,
-        offsetX: 0,
-        offsetY: 0,
-        targetX: x,
-        targetY: y,
-        x: x,
-        y: y,
-        spring: Struct.spring,
-        gravity: Struct.gravity,
-        friction: Struct.friction,
-        isMouseDown: false,
-      })
       return {
         vx: 0,
         vy: 0,
@@ -145,7 +131,6 @@ export default class Struct {
   drawLine(ctx: CanvasRenderingContext2D, shaps: BallInstance[]) {
     let { shapsStates } = this;
     shaps.forEach((shap: BallInstance, i: number) => {
-      let ss = shapsStates[i];
       let pre = i === 0 ? shaps.length - 1 : i - 1;
       let preShap = shaps[pre];
 

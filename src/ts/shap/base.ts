@@ -7,6 +7,11 @@ export class Shap {
   public rotation = 0;
   protected fillStyle: string = "rgba(57,119,224)";
   protected strokeStyle: string = "rgba(0,0,0)";
+  protected alpha:number = 1;
+  protected scaleX:number = 1;
+  protected scaleY:number = 1;
+  protected translateX:number = 0;
+  protected translateY:number = 0;
   protected points: Array<{ x: number, y: number }> = [];
   constructor(option: any) {
     this.propertyInit(option);

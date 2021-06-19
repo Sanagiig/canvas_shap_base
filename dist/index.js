@@ -24,7 +24,7 @@ var __importStar = (this && this.__importStar) || function (mod) {
 define("ts/utils/index", ["require", "exports"], function (require, exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
-    exports.getArrProxy = exports.eventRegister = exports.getDistance = exports.boxBounce = exports.isInBox = exports.propertyInit = void 0;
+    exports.getArrProxy = exports.eventRegister = exports.getDistance = exports.boxBounce = exports.isInBorder = exports.isInBox = exports.propertyInit = void 0;
     exports.default = {
         getOffset(event) {
             return this.eventWraper(event);
@@ -62,6 +62,11 @@ define("ts/utils/index", ["require", "exports"], function (require, exports) {
         return x + r > 0 && x - r <= w && y + r > 0 && y - r <= h;
     }
     exports.isInBox = isInBox;
+    function isInBorder(shap, w, h) {
+        let { x, y, r } = shap;
+        return x - r < 0 || x + r > w || y - r < 0 || y + r > h;
+    }
+    exports.isInBorder = isInBorder;
     function boxBounce(shap, state, w, h) {
         let { x, y, r } = shap;
         let { vx, vy, bounce } = state;
@@ -174,6 +179,11 @@ define("ts/shap/base", ["require", "exports", "ts/utils/index"], function (requi
             this.rotation = 0;
             this.fillStyle = "rgba(57,119,224)";
             this.strokeStyle = "rgba(0,0,0)";
+            this.alpha = 1;
+            this.scaleX = 1;
+            this.scaleY = 1;
+            this.translateX = 0;
+            this.translateY = 0;
             this.points = [];
             this.propertyInit(option);
         }
@@ -241,10 +251,7 @@ define("ts/shap/ball", ["require", "exports", "ts/shap/base"], function (require
     class Ball extends base_2.Shap {
         constructor(option) {
             super(option);
-            this.scaleX = 1;
-            this.scaleY = 1;
             this.r = 20;
-            this.alpha = 1;
         }
         render(ctx) {
             let { fillStyle, strokeStyle, x, y, r, scaleX, scaleY, alpha } = this;
@@ -888,20 +895,6 @@ define("ts/interactive/struct", ["require", "exports", "ts/draw/index", "ts/util
                     s.x = x = Math.cos(angle) * springLen + lx;
                     s.y = y = Math.sin(angle) * springLen + ly;
                 }
-                console.log({
-                    vx: 0,
-                    vy: 0,
-                    offsetX: 0,
-                    offsetY: 0,
-                    targetX: x,
-                    targetY: y,
-                    x: x,
-                    y: y,
-                    spring: Struct.spring,
-                    gravity: Struct.gravity,
-                    friction: Struct.friction,
-                    isMouseDown: false,
-                });
                 return {
                     vx: 0,
                     vy: 0,
@@ -994,7 +987,6 @@ define("ts/interactive/struct", ["require", "exports", "ts/draw/index", "ts/util
         drawLine(ctx, shaps) {
             let { shapsStates } = this;
             shaps.forEach((shap, i) => {
-                let ss = shapsStates[i];
                 let pre = i === 0 ? shaps.length - 1 : i - 1;
                 let preShap = shaps[pre];
                 ctx.save();
@@ -1035,25 +1027,415 @@ define("ts/interactive/struct", ["require", "exports", "ts/draw/index", "ts/util
     Struct.gravity = 0.5;
     Struct.spring = 0.02;
 });
-define("ts/index", ["require", "exports", "ts/draw/index", "ts/draw/index", "ts/shap/arrow", "ts/shap/ball", "ts/animation/ease", "ts/animation/spring", "ts/interactive/spring", "ts/interactive/struct"], function (require, exports, index_23, draw, arrow_1, ball_1, ease_1, spring_1, spring_2, struct_1) {
+define("ts/shap/rect", ["require", "exports", "ts/shap/base"], function (require, exports, base_7) {
+    "use strict";
+    Object.defineProperty(exports, "__esModule", { value: true });
+    exports.Rect = void 0;
+    class Rect extends base_7.Shap {
+        constructor(option) {
+            super(option);
+        }
+        render(ctx) {
+            let { x, y, translateX, translateY, width, height, fillStyle, strokeStyle, scaleX, scaleY, alpha } = this;
+            ctx.save();
+            ctx.fillStyle = fillStyle;
+            ctx.strokeStyle = strokeStyle;
+            ctx.translate(translateX, translateY);
+            ctx.scale(scaleX, scaleY);
+            ctx.globalAlpha = alpha;
+            ctx.beginPath();
+            ctx.rect(x, y, width, height);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+            ctx.restore();
+        }
+    }
+    exports.Rect = Rect;
+});
+define("ts/interactive/projection", ["require", "exports", "ts/draw/index", "ts/utils/index", "ts/shap/rect"], function (require, exports, index_23, index_24, rect_1) {
+    "use strict";
+    Object.defineProperty(exports, "__esModule", { value: true });
+    index_24 = __importStar(index_24);
+    class Projection {
+        constructor(shap, canvas) {
+            this.shapsState = {};
+            this.isMouseDown = false;
+            this.isMove = false;
+            this.friction = 0.95;
+            this.gravity = 0.3;
+            this.easing = 0.3;
+            this.lastX = 0;
+            this.lastY = 0;
+            this.canvas = canvas;
+            this.shap = shap;
+            this.shapsState.vx = 0;
+            this.shapsState.vy = 0;
+            this.linePoint = { x: shap.x, y: shap.y };
+            this.resetBall();
+            this.rect = new rect_1.Rect({
+                x: 400, y: 400, width: 100, height: 50
+            });
+            this.eventMap = {
+                mousedown: this.handleMouseDown.bind(this),
+                mousemove: this.handleMouseMove.bind(this),
+                mouseup: this.handleMouseUp.bind(this),
+            };
+            this.registerMouseEvent();
+        }
+        godie() {
+            this.removeMouseEvent();
+        }
+        registerMouseEvent() {
+            index_24.eventRegister(this.canvas, this.eventMap);
+        }
+        removeMouseEvent() {
+            index_24.eventRegister(this.canvas, this.eventMap, true);
+        }
+        handleMouseDown(event) {
+            if (!this.isMove) {
+                this.isMouseDown = true;
+                this.lastX = this.shap.x;
+                this.lastY = this.shap.y;
+            }
+        }
+        handleMouseMove(event) {
+            let pos = index_24.default.getOffset(event);
+            if (this.isMouseDown) {
+                this.linePoint = pos;
+            }
+        }
+        handleMouseUp(event) {
+            let { shapsState, easing } = this;
+            let pos = index_24.default.getOffset(event);
+            shapsState.vx = easing * (pos.x - this.shap.x);
+            shapsState.vy = easing * (pos.y - this.shap.y);
+            this.isMove = true;
+            this.isMouseDown = false;
+        }
+        spingOther(ss) {
+        }
+        drawLine(ctx) {
+            let { shap, linePoint } = this;
+            if (this.isMouseDown) {
+                ctx.save();
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = "red";
+                ctx.beginPath();
+                ctx.lineTo(linePoint.x, linePoint.y);
+                ctx.lineTo(shap.x, shap.y);
+                ctx.stroke();
+                ctx.restore();
+            }
+        }
+        resetBall() {
+            this.shap.x = 100;
+            this.shap.y = 500;
+            this.isMove = false;
+        }
+        checkHit() {
+            let { rect, shap, lastX, lastY } = this;
+            let { x, y } = shap;
+            let k1 = (y - lastY) / (x - lastX);
+            let b1 = lastY - k1 * lastX;
+            let k2 = 0, b2 = shap.y;
+            let cx = (b2 - b1) / (k1 - k2);
+            let cy = k1 * cx + b1;
+            if (cx - shap.r / 2 > rect.x && cx + shap.r / 2 < rect.x + rect.width && cy - shap.r > rect.y) {
+                return true;
+            }
+            else {
+                return false;
+            }
+        }
+        move(ctx) {
+            window.requestAnimationFrame(_ => {
+                let { shap, shapsState, friction, gravity } = this;
+                index_23.clear(ctx);
+                if (this.isMove) {
+                    shapsState.vx *= friction;
+                    shapsState.vy *= friction;
+                    shapsState.vy += gravity;
+                    shap.x += shapsState.vx;
+                    shap.y += shapsState.vy;
+                }
+                if (!index_24.isInBox(shap, index_23.W, index_23.H) || this.checkHit()) {
+                    this.resetBall();
+                }
+                this.drawLine(ctx);
+                this.rect.render(ctx);
+                shap.render(ctx);
+                this.move(ctx);
+            });
+        }
+    }
+    exports.default = Projection;
+});
+define("ts/animation/advanceTranslate", ["require", "exports", "ts/utils/index", "ts/draw/index", "ts/utils/index", "ts/shap/ball"], function (require, exports, index_25, index_26, index_27, ball_1) {
+    "use strict";
+    Object.defineProperty(exports, "__esModule", { value: true });
+    exports.AdvanceTranslate = void 0;
+    index_25 = __importDefault(index_25);
+    class AdvanceTranslate {
+        constructor(shaps) {
+            this.points = [];
+            this.angle = 1;
+            this.shaps = [];
+            this.shapState = [];
+            this.centerPos = { x: index_26.W / 2, y: index_26.H / 2 };
+            let { centerPos } = this;
+            this.shaps = shaps;
+            shaps.forEach((shap, i) => {
+                this.points[i] = new ball_1.Ball({ x: shap.x, y: shap.y, r: 3, fillStyle: "yellow" });
+                this.shapState[i] = {
+                    x: shap.x,
+                    y: shap.y,
+                    r: index_27.getDistance(shap.x, shap.y, centerPos.x, centerPos.y)
+                };
+            });
+        }
+        drawTrace(ctx) {
+            let { shaps, centerPos } = this;
+            ctx.save();
+            for (let i = 0; i < shaps.length; i++) {
+                let ss = this.shapState[i];
+                // 轨迹
+                ctx.beginPath();
+                ctx.fillStyle = "rgb(255,0,0)";
+                ctx.arc(centerPos.x, centerPos.y, ss.r, 0, 2 * Math.PI);
+                ctx.stroke();
+            }
+            ctx.restore();
+        }
+        move(ctx) {
+            window.requestAnimationFrame(_ => {
+                let { shaps, points, shapState, centerPos } = this;
+                let rad = index_25.default.toRad(this.angle);
+                index_26.clear(ctx);
+                this.drawTrace(ctx);
+                for (let i = 0; i < shaps.length; i++) {
+                    let p = points[i];
+                    let s = shaps[i];
+                    let ss = shapState[i];
+                    let x = s.x - centerPos.x, y = s.y - centerPos.y;
+                    s.x = p.x = centerPos.x + x * Math.cos(rad) - y * Math.sin(rad);
+                    s.y = p.y = centerPos.y + y * Math.cos(rad) + x * Math.sin(rad);
+                    p.r = 3;
+                    s.render(ctx);
+                    p.render(ctx);
+                }
+                // this.angle +=1;
+                this.move(ctx);
+            });
+        }
+    }
+    exports.AdvanceTranslate = AdvanceTranslate;
+});
+define("ts/shap/line", ["require", "exports", "ts/shap/base"], function (require, exports, base_8) {
+    "use strict";
+    Object.defineProperty(exports, "__esModule", { value: true });
+    exports.Line = void 0;
+    class Line extends base_8.Shap {
+        constructor(option) {
+            super(option);
+            this.x2 = 0;
+            this.y2 = 0;
+            this.propertyInit(option);
+        }
+        render(ctx) {
+            let { fillStyle, strokeStyle, x, y, x2, y2, scaleX, scaleY, alpha, translateX, translateY, rotation } = this;
+            ctx.save();
+            ctx.fillStyle = fillStyle;
+            ctx.strokeStyle = strokeStyle;
+            ctx.translate(translateX, translateY);
+            ctx.rotate(rotation);
+            ctx.scale(scaleX, scaleY);
+            ctx.globalAlpha = alpha;
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+            ctx.lineTo(x2, y2);
+            ctx.closePath();
+            ctx.stroke();
+            ctx.restore();
+        }
+    }
+    exports.Line = Line;
+});
+define("ts/interactive/rampBounce", ["require", "exports", "ts/draw/index", "ts/utils/index", "ts/shap/line", "ts/utils/index"], function (require, exports, index_28, index_29, line_1, index_30) {
+    "use strict";
+    Object.defineProperty(exports, "__esModule", { value: true });
+    index_29 = __importStar(index_29);
+    class RampBounce {
+        constructor(shaps, canvas) {
+            this.friction = 0.95;
+            this.gravity = 0.5;
+            this.bounce = 0.7;
+            this.shaps = [];
+            this.lines = [];
+            this.shapsStates = [];
+            this.isMouseDown = false;
+            this.canvas = canvas;
+            this.shaps = shaps.slice();
+            this.lines.push(new line_1.Line({ x: 100, y: 300, x2: 600, y2: 400 }));
+            // this.lines.push(new Line({ x: 100, y: 300, x2: 600, y2: 300, rotation: utils.toRad(2) }))
+            this.eventMap = {
+                mousedown: this.handleMouseDown.bind(this),
+                mousemove: this.handleMouseMove.bind(this),
+                mouseup: this.handleMouseUp.bind(this),
+            };
+            this.shapsStates = shaps.map((s, i) => {
+                return {
+                    vx: 0,
+                    vy: 0,
+                    offsetX: 0,
+                    offsetY: 0,
+                    bounce: this.bounce,
+                    isMouseDown: false,
+                    lastPos: { x: s.x, y: s.y }
+                };
+            });
+            this.registerMouseEvent();
+        }
+        godie() {
+            this.removeMouseEvent();
+        }
+        registerMouseEvent() {
+            index_29.eventRegister(this.canvas, this.eventMap);
+        }
+        removeMouseEvent() {
+            index_29.eventRegister(this.canvas, this.eventMap, true);
+        }
+        handleMouseDown(event) {
+            let pos = index_29.default.getOffset(event);
+            let i = this.shaps.length;
+            while (--i >= 0) {
+                let s = this.shaps[i];
+                let ss = this.shapsStates[i];
+                let distance = index_29.getDistance(pos.x, pos.y, s.x, s.y);
+                if (distance <= s.r) {
+                    ss.vx = 0;
+                    ss.vy = 0;
+                    ss.isMouseDown = true;
+                    ss.offsetX = pos.x - s.x;
+                    ss.offsetY = pos.y - s.y;
+                    break;
+                }
+            }
+            this.isMouseDown = true;
+        }
+        handleMouseMove(event) {
+            let { shaps, shapsStates, isMouseDown } = this;
+            if (isMouseDown) {
+                let pos = index_29.default.getOffset(event);
+                let selI = shapsStates.findIndex(ss => ss.isMouseDown);
+                if (selI > -1) {
+                    const power = 5;
+                    let s = shaps[selI];
+                    let ss = shapsStates[selI];
+                    // ss.vx = (pos.x - ss.lastPos.x) * power;
+                    // ss.vy = (pos.y - ss.lastPos.y) * power;
+                    ss.lastPos = pos;
+                    s.x = pos.x - ss.offsetX;
+                    s.y = pos.y - ss.offsetY;
+                }
+            }
+        }
+        handleMouseUp(event) {
+            let { shapsStates } = this;
+            let selI = shapsStates.findIndex(ss => ss.isMouseDown);
+            let pos = index_29.default.getOffset(event);
+            if (selI > -1) {
+                let ss = shapsStates[selI];
+                ss.vy = 5;
+                ss.isMouseDown = false;
+            }
+            this.isMouseDown = false;
+        }
+        spingOther(ss) {
+        }
+        drawLine(ctx, shaps) {
+            this.lines.forEach(l => l.render(ctx));
+        }
+        checkHitLine(s, ss) {
+            let line = this.lines[0];
+            let lx = line.x, lx2 = line.x2, ly = line.y, ly2 = line.y2;
+            let x = s.x - lx, y = s.y - ly;
+            let lrad = Math.atan2(ly2 - ly, lx2 - lx);
+            let lcos = Math.cos(lrad), lsin = Math.sin(lrad);
+            let x1 = x * lcos + y * lsin, y1 = y * lcos - x * lsin;
+            let vx1 = ss.vx * lcos + ss.vy * lsin, vy1 = ss.vy * lcos - ss.vx * lsin;
+            let isOnline = (s.x + s.r >= lx && s.x - s.r <= lx2 && vy1 > y1);
+            let res = false;
+            if (this.isMouseDown) {
+                // console.log("y1", y1, utils.toAng(lrad), isOnline)
+            }
+            if (y1 + s.r >= 0 && isOnline) {
+                res = true;
+                y1 = -s.r;
+                vy1 *= -ss.bounce;
+                // console.log("hit", ss.vx, ss.vy, utils.toAng(lrad));
+            }
+            x = x1 * lcos - y1 * lsin;
+            y = y1 * lcos + x1 * lsin;
+            // if(this.isMouseDown) console.log("before vx",vx1,vy1 );
+            ss.vx = vx1 * lcos - vy1 * lsin;
+            ss.vy = vy1 * lcos + vx1 * lsin;
+            // if(this.isMouseDown) console.log("after vx",ss.vx,ss.vy );
+            s.x = lx + x;
+            s.y = ly + y;
+            return res;
+        }
+        move(ctx) {
+            window.requestAnimationFrame(_ => {
+                let { shaps, shapsStates, friction, gravity, bounce } = this;
+                index_28.clear(ctx);
+                this.drawLine(ctx, shaps);
+                shaps.forEach((shap, i) => {
+                    let ss = shapsStates[i];
+                    this.checkHitLine(shap, ss);
+                    if (!ss.isMouseDown) {
+                        ss.vy += shap.y + shap.r < index_28.H ? gravity : 0;
+                        // ss.vx *= friction;
+                        // ss.vy *= friction;
+                        shap.x += ss.vx;
+                        shap.y += ss.vy;
+                        if (this.checkHitLine(shap, ss)) {
+                            // ss.vy -= gravity;
+                        }
+                        else if (index_29.isInBorder(shap, index_28.W, index_28.H)) {
+                            index_30.boxBounce(shap, ss, index_28.W, index_28.H);
+                            // console.log("isInBorder", ss.vx, ss.vy)
+                        }
+                    }
+                    shap.render(ctx);
+                });
+                this.move(ctx);
+            });
+        }
+    }
+    exports.default = RampBounce;
+});
+define("ts/index", ["require", "exports", "ts/draw/index", "ts/shap/arrow", "ts/shap/ball", "ts/interactive/rampBounce"], function (require, exports, draw, arrow_1, ball_2, rampBounce_1) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     draw = __importStar(draw);
     arrow_1 = __importDefault(arrow_1);
-    spring_2 = __importDefault(spring_2);
-    struct_1 = __importDefault(struct_1);
+    rampBounce_1 = __importDefault(rampBounce_1);
     function init(e) {
         let canvas = document.getElementById("canvas");
         let ctx = canvas.getContext("2d");
         let arrow = new arrow_1.default({ x: draw.W / 2, y: draw.H / 6 });
         let balls = new Array(120);
         for (let i = 0; i < balls.length; i++) {
-            balls[i] = new ball_1.Ball({ x: draw.W * Math.random(), y: draw.H * Math.random(), r: 30 });
+            balls[i] = new ball_2.Ball({ x: draw.W * Math.random(), y: draw.H * Math.random(), r: 30 });
         }
-        let ease = new ease_1.EaseAnimation([balls[0]], [index_23.W / 2, index_23.H / 2]);
-        let spring = new spring_1.SpringAnimation([balls[2]], [index_23.W / 2, index_23.H / 2]);
-        let springInt = new spring_2.default([balls[0]], canvas);
-        let structIns = new struct_1.default(balls.slice(0, 10), canvas);
+        // let ease = new EaseAnimation([balls[0]], [W / 2, H / 2]);
+        // let spring = new SpringAnimation([balls[2]], [W / 2, H / 2]);
+        // let springInt = new Spring([balls[0]], canvas);
+        // let structIns = new Struct(balls.slice(0, 10), canvas);
+        // let projection = new Projection(balls[0],canvas);
+        // let adt = new AdvanceTranslate(balls.slice(0,5));
+        let ramBounce = new rampBounce_1.default(balls.slice(0, 1), canvas);
         // let throwIns = new Throw([balls[0]],canvas);
         // let slide = new Slide([ball]);
         // let circle = new Circle([ball, arrow]);
@@ -1102,7 +1484,10 @@ define("ts/index", ["require", "exports", "ts/draw/index", "ts/draw/index", "ts/
         // ease.move(ctx);
         // spring.move(ctx);
         // springInt.move(ctx);
-        structIns.move(ctx);
+        // structIns.move(ctx);
+        // projection.move(ctx);
+        // adt.move(ctx);
+        ramBounce.move(ctx);
     }
     exports.default = init;
 });

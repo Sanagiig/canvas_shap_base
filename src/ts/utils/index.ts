@@ -35,7 +35,10 @@ export function isInBox(shap: BallInstance, w: number, h: number): boolean {
   let { x, y, r } = shap;
   return x + r > 0 && x - r <= w && y + r > 0 && y - r <= h
 }
-
+export function isInBorder(shap: BallInstance, w: number, h: number){
+  let { x, y, r } = shap;
+  return x - r < 0 || x + r > w || y - r < 0 || y + r > h
+}
 export function boxBounce(shap: BallInstance, state: ShapState, w: number, h: number): void {
   let { x, y, r } = shap;
   let { vx, vy, bounce } = state;

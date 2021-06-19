@@ -16,7 +16,9 @@ import { SpringAnimation } from './animation/spring';
 import Throw from './interactive/throw';
 import Spring from './interactive/spring';
 import Struct from './interactive/struct';
-
+import Projection from './interactive/projection';
+import { AdvanceTranslate } from './animation/advanceTranslate';
+import RampBounce from './interactive/rampBounce';
 export default function init(e: Event) {
   let canvas = <HTMLCanvasElement>document.getElementById("canvas");
   let ctx = <CanvasRenderingContext2D>canvas.getContext("2d");
@@ -25,10 +27,13 @@ export default function init(e: Event) {
   for (let i = 0; i < balls.length; i++) {
     balls[i] = new Ball({ x: draw.W * Math.random(), y: draw.H * Math.random(), r: 30 });
   }
-  let ease = new EaseAnimation([balls[0]], [W / 2, H / 2]);
-  let spring = new SpringAnimation([balls[2]], [W / 2, H / 2]);
-  let springInt = new Spring([balls[0]], canvas);
-  let structIns = new Struct(balls.slice(0, 10), canvas);
+  // let ease = new EaseAnimation([balls[0]], [W / 2, H / 2]);
+  // let spring = new SpringAnimation([balls[2]], [W / 2, H / 2]);
+  // let springInt = new Spring([balls[0]], canvas);
+  // let structIns = new Struct(balls.slice(0, 10), canvas);
+  // let projection = new Projection(balls[0],canvas);
+  // let adt = new AdvanceTranslate(balls.slice(0,5));
+  let ramBounce = new RampBounce(balls.slice(0,1),canvas);
   // let throwIns = new Throw([balls[0]],canvas);
   // let slide = new Slide([ball]);
   // let circle = new Circle([ball, arrow]);
@@ -81,5 +86,8 @@ export default function init(e: Event) {
   // ease.move(ctx);
   // spring.move(ctx);
   // springInt.move(ctx);
-  structIns.move(ctx);
+  // structIns.move(ctx);
+  // projection.move(ctx);
+  // adt.move(ctx);
+  ramBounce.move(ctx);
 }
